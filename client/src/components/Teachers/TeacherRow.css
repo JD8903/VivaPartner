@@ -1,0 +1,23 @@
+.actions{
+    display:flex;
+    gap:10px;
+}
+
+.edit-btn,
+.delete-btn{
+    border:none;
+    padding:8px 16px;
+    border-radius:8px;
+    cursor:pointer;
+    font-weight:600;
+}
+
+.edit-btn{
+    background:#2563eb;
+    color:#fff;
+}
+
+.delete-btn{
+    background:#ef4444;
+    color:#fff;
+}

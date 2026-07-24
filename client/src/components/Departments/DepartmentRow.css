@@ -1,0 +1,43 @@
+.actions{
+    display:flex;
+    gap:10px;
+}
+
+.view-btn,
+.edit-btn,
+.delete-btn{
+    padding:8px 16px;
+    border-radius:8px;
+    font-weight:600;
+    text-decoration:none;
+    border:none;
+    cursor:pointer;
+    transition:.3s;
+}
+
+.view-btn{
+    background:#10b981;
+    color:#fff;
+}
+
+.view-btn:hover{
+    background:#059669;
+}
+
+.edit-btn{
+    background:#2563eb;
+    color:#fff;
+}
+
+.edit-btn:hover{
+    background:#1d4ed8;
+}
+
+.delete-btn{
+    background:#ef4444;
+    color:#fff;
+}
+
+.delete-btn:hover{
+    background:#dc2626;
+}

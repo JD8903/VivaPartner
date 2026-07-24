@@ -1,0 +1,30 @@
+.table-container{
+    background:#fff;
+    border-radius:15px;
+    overflow:auto;
+    box-shadow:0 10px 30px rgba(0,0,0,.08);
+}
+
+table{
+    width:100%;
+    border-collapse:collapse;
+}
+
+th,
+td{
+    padding:18px;
+    text-align:left;
+}
+
+th{
+    background:#f8fafc;
+    color:#1e293b;
+}
+
+tbody tr{
+    border-bottom:1px solid #edf2f7;
+}
+
+tbody tr:hover{
+    background:#f8fbff;
+}

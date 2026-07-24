@@ -1,0 +1,146 @@
+/* ==========================================
+   ROLE SELECTOR
+========================================== */
+
+.role-selector {
+  display: flex;
+  gap: 12px;
+  margin-bottom: 28px;
+}
+
+/* ==========================================
+   BUTTON
+========================================== */
+
+.role-btn {
+  flex: 1;
+
+  display: flex;
+  align-items: center;
+  gap: 14px;
+
+  padding: 14px 18px;
+
+  background: #ffffff;
+
+  border: 1.5px solid #dbe4f0;
+  border-radius: 14px;
+
+  cursor: pointer;
+
+  transition: all .3s ease;
+
+  text-align: left;
+}
+
+.role-btn:hover {
+  border-color: #2563eb;
+  background: #f8fbff;
+
+  transform: translateY(-2px);
+
+  box-shadow: 0 10px 22px rgba(37, 99, 235, .08);
+}
+
+/* ==========================================
+   ACTIVE
+========================================== */
+
+.role-btn.active {
+  background: linear-gradient(
+    135deg,
+    #2563eb,
+    #1d4ed8
+  );
+
+  border-color: #2563eb;
+
+  color: white;
+
+  box-shadow: 0 12px 28px rgba(37, 99, 235, .28);
+}
+
+.role-btn.active .role-title,
+.role-btn.active .role-desc,
+.role-btn.active .role-btn-icon {
+  color: white;
+}
+
+/* ==========================================
+   ICON
+========================================== */
+
+.role-btn-icon {
+  width: 46px;
+  height: 46px;
+
+  display: flex;
+  align-items: center;
+  justify-content: center;
+
+  padding: 12px;
+
+  border-radius: 12px;
+
+  background: #eff6ff;
+
+  color: #2563eb;
+
+  font-size: 18px;
+
+  flex-shrink: 0;
+
+  transition: .3s;
+}
+
+.role-btn.active .role-btn-icon {
+  background: rgba(255,255,255,.18);
+}
+
+/* ==========================================
+   TEXT
+========================================== */
+
+.role-content {
+  display: flex;
+  flex-direction: column;
+}
+
+.role-title {
+  font-size: 15px;
+  font-weight: 600;
+  color: #1e293b;
+}
+
+.role-desc {
+  margin-top: 4px;
+
+  font-size: 13px;
+
+  color: #64748b;
+}
+
+/* ==========================================
+   FOCUS
+========================================== */
+
+.role-btn:focus-visible {
+  outline: 3px solid rgba(37,99,235,.2);
+  outline-offset: 2px;
+}
+
+/* ==========================================
+   RESPONSIVE
+========================================== */
+
+@media (max-width:600px) {
+
+  .role-selector {
+    flex-direction: column;
+  }
+
+  .role-btn {
+    width: 100%;
+  }
+
+}

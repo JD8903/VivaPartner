@@ -1,0 +1,107 @@
+.delete-assignment-overlay{
+    position:fixed;
+    inset:0;
+    background:rgba(0,0,0,.45);
+    display:flex;
+    justify-content:center;
+    align-items:center;
+    z-index:1000;
+    padding:20px;
+}
+
+.delete-assignment-modal{
+    width:100%;
+    max-width:450px;
+    background:#fff;
+    border-radius:12px;
+    padding:30px;
+    box-shadow:0 10px 30px rgba(0,0,0,.2);
+    animation:fadeIn .25s ease;
+}
+
+.delete-assignment-modal h2{
+    margin:0 0 15px;
+    color:#111827;
+    font-size:24px;
+}
+
+.delete-assignment-modal p{
+    color:#4b5563;
+    line-height:1.6;
+}
+
+.assignment-details{
+    margin:20px 0;
+    padding:15px;
+    border-radius:10px;
+    background:#f8fafc;
+    border:1px solid #e5e7eb;
+}
+
+.assignment-details p{
+    margin:8px 0;
+    font-size:15px;
+}
+
+.delete-assignment-actions{
+    display:flex;
+    justify-content:flex-end;
+    gap:12px;
+    margin-top:25px;
+}
+
+.cancel-btn{
+    padding:10px 20px;
+    border:none;
+    border-radius:8px;
+    background:#6b7280;
+    color:#fff;
+    cursor:pointer;
+    transition:.3s;
+}
+
+.cancel-btn:hover{
+    background:#4b5563;
+}
+
+.delete-btn{
+    padding:10px 20px;
+    border:none;
+    border-radius:8px;
+    background:#ef4444;
+    color:#fff;
+    cursor:pointer;
+    transition:.3s;
+}
+
+.delete-btn:hover{
+    background:#dc2626;
+}
+
+@keyframes fadeIn{
+    from{
+        opacity:0;
+        transform:translateY(-20px);
+    }
+    to{
+        opacity:1;
+        transform:translateY(0);
+    }
+}
+
+@media(max-width:768px){
+
+.delete-assignment-modal{
+    padding:20px;
+}
+
+.delete-assignment-actions{
+    flex-direction:column;
+}
+
+.cancel-btn,
+.delete-btn{
+    width:100%;
+}
+
+}

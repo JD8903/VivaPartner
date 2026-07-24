@@ -1,0 +1,81 @@
+.add-teacher-page {
+  display: flex;
+  justify-content: center;
+  padding: 30px;
+}
+
+.teacher-card {
+  width: 100%;
+  max-width: 650px;
+  background: #fff;
+  padding: 30px;
+  border-radius: 18px;
+  box-shadow: 0 15px 40px rgba(0,0,0,.08);
+}
+
+.teacher-card h2 {
+  margin-bottom: 8px;
+  color: #1e293b;
+}
+
+.teacher-card p {
+  color: #64748b;
+  margin-bottom: 25px;
+}
+
+.input-group {
+  margin-bottom: 20px;
+}
+
+.input-group label {
+  display: block;
+  margin-bottom: 8px;
+  font-weight: 600;
+  color: #334155;
+}
+
+.input-group input {
+  width: 100%;
+  padding: 13px 15px;
+  border: 1px solid #dbe4f0;
+  border-radius: 10px;
+  font-size: 15px;
+  transition: .3s;
+}
+
+.input-group input:focus {
+  outline: none;
+  border-color: #2563eb;
+  box-shadow: 0 0 0 4px rgba(37,99,235,.15);
+}
+
+.submit-btn {
+  width: 100%;
+  padding: 14px;
+  border: none;
+  border-radius: 10px;
+  background: #2563eb;
+  color: #fff;
+  font-size: 16px;
+  font-weight: 600;
+  cursor: pointer;
+  transition: .3s;
+}
+
+.submit-btn:hover:not(:disabled) {
+  background: #1d4ed8;
+}
+
+.submit-btn:disabled {
+  opacity: .7;
+  cursor: not-allowed;
+}
+
+.message {
+  margin-bottom: 20px;
+  padding: 12px;
+  border-radius: 10px;
+  background: #eff6ff;
+  color: #1d4ed8;
+  border: 1px solid #bfdbfe;
+}

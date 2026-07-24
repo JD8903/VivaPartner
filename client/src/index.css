@@ -1,0 +1,94 @@
+html{
+    scroll-behavior:smooth;
+}
+
+*{
+    margin:0;
+    padding:0;
+    box-sizing:border-box;
+}
+
+body{
+    font-family:"Poppins",sans-serif;
+    overflow-x:hidden;
+
+    color:#0f172a;
+}
+
+::-webkit-scrollbar{
+    width:10px;
+}
+
+::-webkit-scrollbar-track{
+    background:#edf4ff;
+}
+
+::-webkit-scrollbar-thumb{
+    background:#2563eb;
+    border-radius:20px;
+}
+
+::-webkit-scrollbar-thumb:hover{
+    background:#1d4ed8;
+}
+::selection{
+    background:#2563eb;
+    color:white;
+}
+button:focus-visible,
+a:focus-visible{
+
+    outline:3px solid #60a5fa;
+
+    outline-offset:4px;
+
+    border-radius:8px;
+}
+button{
+
+    transition:
+        transform .3s,
+        box-shadow .3s,
+        background .3s;
+
+}
+
+button:hover{
+
+    transform:translateY(-4px);
+
+    box-shadow:0 12px 30px rgba(37,99,235,.25);
+
+}
+.feature-card,
+.tech-card,
+.why-card,
+.mission-card,
+.workflow-card{
+
+    transition:
+    transform .35s,
+    box-shadow .35s;
+
+}
+
+.feature-card:hover,
+.tech-card:hover,
+.why-card:hover,
+.mission-card:hover,
+.workflow-card:hover{
+
+    transform:translateY(-10px);
+
+}
+body{
+
+background:
+
+radial-gradient(circle at top right,#dbeafe 0%,transparent 35%),
+
+radial-gradient(circle at bottom left,#eff6ff 0%,transparent 40%),
+
+#ffffff;
+
+}

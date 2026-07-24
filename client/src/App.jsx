@@ -1,17 +1,7 @@
-import { useEffect } from "react";
-import API from "../../server/services/api"
+import AppRoutes from "./routes/AppRoutes";
 
 function App() {
-
-    useEffect(() => {
-        API.get("/")
-            .then((res) => console.log(res.data))
-            .catch((err) => console.error(err));
-    }, []);
-
-    return (
-        <h1>VivaPartner</h1>
-    );
+    return <AppRoutes />;
 }
 
 export default App;

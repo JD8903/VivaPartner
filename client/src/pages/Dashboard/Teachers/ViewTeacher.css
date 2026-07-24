@@ -1,0 +1,154 @@
+.view-teacher-container {
+  max-width: 800px;
+  margin: 30px auto;
+}
+
+.view-title {
+  font-size: 30px;
+  font-weight: 700;
+  color: #1f2937;
+  margin-bottom: 25px;
+}
+
+.teacher-card {
+  background: #ffffff;
+  border-radius: 16px;
+  padding: 35px;
+  box-shadow: 0 8px 25px rgba(0, 0, 0, 0.08);
+}
+
+.teacher-avatar {
+  width: 90px;
+  height: 90px;
+  border-radius: 50%;
+  background: #2563eb;
+  color: #fff;
+  font-size: 36px;
+  font-weight: 700;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  margin: 0 auto 25px;
+}
+
+.teacher-info {
+  display: grid;
+  grid-template-columns: 170px 1fr;
+  row-gap: 18px;
+  column-gap: 20px;
+}
+
+.teacher-info label {
+  font-weight: 600;
+  color: #6b7280;
+}
+
+.teacher-info p {
+  color: #111827;
+  font-size: 16px;
+  margin: 0;
+}
+
+.status {
+  display: inline-block;
+  padding: 6px 14px;
+  border-radius: 30px;
+  font-size: 14px;
+  font-weight: 600;
+}
+
+.status.active {
+  background: #dcfce7;
+  color: #15803d;
+}
+
+.status.inactive {
+  background: #fee2e2;
+  color: #b91c1c;
+}
+
+.button-group {
+  display: flex;
+  justify-content: flex-end;
+  gap: 15px;
+  margin-top: 35px;
+}
+
+.back-btn,
+.edit-btn {
+  text-decoration: none;
+  padding: 11px 24px;
+  border-radius: 8px;
+  font-weight: 600;
+  transition: 0.3s;
+}
+
+.back-btn {
+  background: #e5e7eb;
+  color: #111827;
+}
+
+.back-btn:hover {
+  background: #d1d5db;
+}
+
+.edit-btn {
+  background: #2563eb;
+  color: white;
+}
+
+.edit-btn:hover {
+  background: #1d4ed8;
+}
+
+.loading {
+  text-align: center;
+  font-size: 20px;
+  padding: 60px;
+  color: #6b7280;
+}
+
+@media (max-width: 768px) {
+  .teacher-card {
+    padding: 25px;
+  }
+
+  .teacher-info {
+    grid-template-columns: 1fr;
+    row-gap: 10px;
+  }
+
+  .button-group {
+    flex-direction: column;
+  }
+
+  .back-btn,
+  .edit-btn {
+    text-align: center;
+  }
+}
+.view-btn {
+  background: #10b981;
+  color: white;
+  padding: 10px 18px;
+  border-radius: 8px;
+  text-decoration: none;
+  font-weight: 600;
+  transition: 0.3s;
+}
+
+.view-btn:hover {
+  background: #059669;
+}
+.actions {
+  display: flex;
+  gap: 10px;
+  align-items: center;
+}
+
+.edit-btn,
+.delete-btn,
+.view-btn {
+  min-width: 90px;
+  text-align: center;
+}

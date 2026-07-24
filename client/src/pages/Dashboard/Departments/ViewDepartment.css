@@ -1,0 +1,134 @@
+.view-department-container {
+  padding: 30px;
+  display: flex;
+  justify-content: center;
+  align-items: flex-start;
+}
+
+.department-card {
+  width: 100%;
+  max-width: 750px;
+  background: #ffffff;
+  border-radius: 16px;
+  padding: 35px;
+  box-shadow: 0 8px 30px rgba(0, 0, 0, 0.08);
+  text-align: center;
+}
+
+.department-avatar {
+  width: 100px;
+  height: 100px;
+  margin: 0 auto 25px;
+  border-radius: 50%;
+  background: #2563eb;
+  color: #ffffff;
+  font-size: 38px;
+  font-weight: 700;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.department-info h1 {
+  color: #1e293b;
+  font-size: 30px;
+  margin-bottom: 25px;
+}
+
+.department-info p {
+  font-size: 16px;
+  color: #475569;
+  margin-bottom: 16px;
+  text-align: left;
+  line-height: 1.7;
+}
+
+.department-info strong {
+  color: #0f172a;
+}
+
+.status {
+  display: inline-block;
+  margin-left: 10px;
+  padding: 6px 14px;
+  border-radius: 20px;
+  font-size: 13px;
+  font-weight: 600;
+}
+
+.status.active {
+  background: #dcfce7;
+  color: #15803d;
+}
+
+.status.inactive {
+  background: #fee2e2;
+  color: #dc2626;
+}
+
+.button-group {
+  display: flex;
+  justify-content: center;
+  gap: 18px;
+  margin-top: 35px;
+}
+
+.back-btn,
+.edit-btn {
+  padding: 12px 24px;
+  border-radius: 10px;
+  text-decoration: none;
+  font-weight: 600;
+  font-size: 15px;
+  cursor: pointer;
+  transition: all 0.3s ease;
+}
+
+.back-btn {
+  border: none;
+  background: #e5e7eb;
+  color: #374151;
+}
+
+.back-btn:hover {
+  background: #d1d5db;
+}
+
+.edit-btn {
+  background: #2563eb;
+  color: #ffffff;
+}
+
+.edit-btn:hover {
+  background: #1d4ed8;
+}
+
+@media (max-width: 768px) {
+  .view-department-container {
+    padding: 20px;
+  }
+
+  .department-card {
+    padding: 25px;
+  }
+
+  .department-avatar {
+    width: 80px;
+    height: 80px;
+    font-size: 30px;
+  }
+
+  .department-info h1 {
+    font-size: 24px;
+  }
+
+  .button-group {
+    flex-direction: column;
+  }
+
+  .back-btn,
+  .edit-btn {
+    width: 100%;
+    text-align: center;
+  }
+}

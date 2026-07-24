@@ -1,0 +1,53 @@
+.edit-teacher-page{
+    display:flex;
+    justify-content:center;
+    padding:30px;
+}
+
+.edit-card{
+    width:100%;
+    max-width:650px;
+    background:#fff;
+    padding:30px;
+    border-radius:18px;
+    box-shadow:0 12px 35px rgba(0,0,0,.08);
+}
+
+.edit-card h2{
+    margin-bottom:25px;
+}
+
+.edit-card form{
+    display:flex;
+    flex-direction:column;
+    gap:18px;
+}
+
+.edit-card input,
+.edit-card select{
+    padding:14px;
+    border:1px solid #dbe4f0;
+    border-radius:10px;
+    font-size:15px;
+}
+
+.edit-card input:focus,
+.edit-card select:focus{
+    outline:none;
+    border-color:#2563eb;
+}
+
+.edit-card button{
+    padding:14px;
+    border:none;
+    border-radius:10px;
+    background:#2563eb;
+    color:#fff;
+    font-size:16px;
+    font-weight:600;
+    cursor:pointer;
+}
+
+.edit-card button:hover{
+    background:#1d4ed8;
+}

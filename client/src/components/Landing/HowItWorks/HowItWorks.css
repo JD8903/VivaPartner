@@ -1,0 +1,169 @@
+.workflow{
+    padding:100px 7%;
+    background:linear-gradient(180deg,#f8fbff,#eef5ff);
+}
+
+.workflow-header{
+    max-width:700px;
+    margin:auto;
+    text-align:center;
+    margin-bottom:70px;
+}
+
+.workflow-badge{
+    display:inline-block;
+    padding:10px 18px;
+    background:#dbeafe;
+    color:#2563eb;
+    border-radius:50px;
+    font-size:14px;
+    font-weight:600;
+    margin-bottom:20px;
+}
+
+.workflow-header h2{
+    font-size:42px;
+    color:#0f172a;
+    margin-bottom:20px;
+}
+
+.workflow-header span{
+    color:#2563eb;
+}
+
+.workflow-header p{
+    color:#64748b;
+    font-size:18px;
+    line-height:1.8;
+}
+
+.workflow-container{
+    max-width:1200px;
+    margin:auto;
+    position:relative;
+}
+
+.workflow-item{
+    display:flex;
+    align-items:flex-start;
+    position:relative;
+    margin-bottom:45px;
+}
+
+.workflow-icon{
+
+    width:70px;
+    height:70px;
+    min-width:70px;
+
+    border-radius:20px;
+
+    background:linear-gradient(135deg,#2563eb,#3b82f6);
+
+    color:white;
+
+    display:flex;
+    justify-content:center;
+    align-items:center;
+
+    font-size:28px;
+
+    box-shadow:0 15px 30px rgba(37,99,235,.25);
+
+    z-index:2;
+}
+
+.workflow-line{
+
+    position:absolute;
+
+    left:34px;
+
+    top:70px;
+
+    width:4px;
+
+    height:95px;
+
+    background:#c7d2fe;
+
+}
+
+.workflow-card{
+
+    margin-left:30px;
+
+    background:rgba(255,255,255,.75);
+
+    backdrop-filter:blur(20px);
+
+    border:1px solid rgba(255,255,255,.5);
+
+    border-radius:22px;
+
+    padding:30px;
+
+    width:100%;
+
+    box-shadow:0 15px 35px rgba(0,0,0,.08);
+
+    transition:.35s;
+}
+
+.workflow-card:hover{
+
+    transform:translateX(10px);
+
+    box-shadow:0 20px 45px rgba(37,99,235,.15);
+
+}
+
+.step-number{
+
+    display:inline-block;
+
+    margin-bottom:15px;
+
+    color:#2563eb;
+
+    font-weight:700;
+
+    font-size:14px;
+
+}
+
+.workflow-card h3{
+
+    font-size:24px;
+
+    margin-bottom:15px;
+
+    color:#0f172a;
+
+}
+
+.workflow-card p{
+
+    color:#64748b;
+
+    line-height:1.8;
+
+}
+
+@media(max-width:768px){
+
+.workflow-item{
+flex-direction:column;
+align-items:center;
+text-align:center;
+}
+
+.workflow-card{
+margin:25px 0 0;
+}
+
+.workflow-line{
+display:none;
+}
+
+}

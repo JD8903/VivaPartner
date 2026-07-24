@@ -1,0 +1,161 @@
+.view-assignment-page{
+    padding:30px;
+    background:#f5f7fb;
+    min-height:100vh;
+}
+
+.view-header{
+    display:flex;
+    justify-content:space-between;
+    align-items:center;
+    margin-bottom:30px;
+    flex-wrap:wrap;
+    gap:15px;
+}
+
+.view-header h2{
+    color:#1e293b;
+    font-size:30px;
+    font-weight:700;
+}
+
+.back-btn,
+.edit-btn{
+    display:flex;
+    align-items:center;
+    gap:8px;
+    text-decoration:none;
+    border:none;
+    cursor:pointer;
+    padding:12px 20px;
+    border-radius:10px;
+    font-weight:600;
+    transition:.3s;
+}
+
+.back-btn{
+    background:#fff;
+    color:#2563eb;
+    border:1px solid #2563eb;
+}
+
+.back-btn:hover{
+    background:#2563eb;
+    color:#fff;
+}
+
+.edit-btn{
+    background:#2563eb;
+    color:#fff;
+}
+
+.edit-btn:hover{
+    background:#1d4ed8;
+}
+
+.details-grid{
+    display:grid;
+    grid-template-columns:repeat(auto-fit,minmax(330px,1fr));
+    gap:25px;
+}
+
+.detail-card{
+    background:#fff;
+    border-radius:16px;
+    padding:25px;
+    box-shadow:0 8px 20px rgba(0,0,0,.05);
+}
+
+.detail-card h3{
+    display:flex;
+    align-items:center;
+    gap:10px;
+    color:#2563eb;
+    margin-bottom:25px;
+    font-size:22px;
+}
+
+.detail-row{
+    display:flex;
+    justify-content:space-between;
+    align-items:center;
+    padding:14px 0;
+    border-bottom:1px solid #edf2f7;
+}
+
+.detail-row:last-child{
+    border:none;
+}
+
+.detail-row span{
+    color:#64748b;
+    font-weight:600;
+}
+
+.detail-row p{
+    color:#1e293b;
+    font-weight:600;
+    text-align:right;
+}
+
+.status{
+    padding:7px 16px;
+    border-radius:30px;
+    font-size:14px;
+    color:#fff;
+}
+
+.active{
+    background:#16a34a;
+}
+
+.inactive{
+    background:#dc2626;
+}
+
+.date-card{
+    margin-top:30px;
+    background:#fff;
+    border-radius:16px;
+    padding:25px;
+    box-shadow:0 8px 20px rgba(0,0,0,.05);
+}
+
+.view-assignment-loading{
+    display:flex;
+    justify-content:center;
+    align-items:center;
+    min-height:80vh;
+    font-size:22px;
+    font-weight:600;
+    color:#2563eb;
+}
+
+@media(max-width:768px){
+
+.view-header{
+    flex-direction:column;
+    align-items:flex-start;
+}
+
+.view-header h2{
+    font-size:26px;
+}
+
+.detail-row{
+    flex-direction:column;
+    align-items:flex-start;
+    gap:8px;
+}
+
+.detail-row p{
+    text-align:left;
+}
+
+.back-btn,
+.edit-btn{
+    width:100%;
+    justify-content:center;
+}
+
+}

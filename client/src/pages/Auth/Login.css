@@ -1,0 +1,282 @@
+/* ======================================================
+   LOGIN PAGE
+====================================================== */
+
+.login-page {
+  min-height: 100vh;
+  padding: 40px;
+
+  display: flex;
+  justify-content: center;
+  align-items: center;
+
+  background:
+    radial-gradient(circle at top left, rgba(37,99,235,.18), transparent 35%),
+    radial-gradient(circle at bottom right, rgba(59,130,246,.15), transparent 30%),
+    linear-gradient(135deg,#eff6ff,#dbeafe);
+}
+
+.login-wrapper {
+
+  width:100%;
+  max-width:1320px;
+
+  min-height:720px;
+
+  display:grid;
+  grid-template-columns:1fr 1fr;
+
+  overflow:hidden;
+
+  border-radius:28px;
+
+  background:#ffffff;
+
+  box-shadow:
+      0 25px 60px rgba(15,23,42,.12);
+}
+
+/* ======================================================
+   LEFT PANEL
+====================================================== */
+
+.login-left{
+
+    position:relative;
+
+    overflow:hidden;
+
+    background:linear-gradient(
+        135deg,
+        #2563eb,
+        #1d4ed8,
+        #1e40af
+    );
+
+    color:#fff;
+
+    padding:70px;
+
+    display:flex;
+    align-items:center;
+}
+
+.branding{
+
+    position:relative;
+    z-index:2;
+
+    max-width:480px;
+}
+
+/* Logo */
+
+.logo-box{
+
+    width:88px;
+    height:88px;
+
+    display:flex;
+    justify-content:center;
+    align-items:center;
+
+    border-radius:24px;
+
+    background:rgba(255,255,255,.18);
+
+    backdrop-filter:blur(12px);
+
+    font-size:34px;
+    font-weight:700;
+
+    margin-bottom:24px;
+}
+
+/* Badge */
+
+.brand-badge{
+
+    display:inline-flex;
+
+    padding:8px 16px;
+
+    border-radius:999px;
+
+    background:rgba(255,255,255,.15);
+
+    border:1px solid rgba(255,255,255,.18);
+
+    font-size:14px;
+
+    margin-bottom:22px;
+}
+
+.branding h1{
+
+    font-size:52px;
+
+    font-weight:700;
+
+    margin-bottom:18px;
+}
+
+.tagline{
+
+    font-size:18px;
+
+    line-height:1.8;
+
+    opacity:.92;
+
+    margin-bottom:45px;
+}
+
+/* ======================================================
+   FEATURES
+====================================================== */
+
+.feature-list{
+
+    display:flex;
+    flex-direction:column;
+
+    gap:20px;
+}
+
+.feature-item{
+
+    display:flex;
+    align-items:center;
+
+    gap:16px;
+
+    font-size:17px;
+    font-weight:500;
+
+    opacity:.95;
+}
+
+.feature-item svg{
+
+    width:48px;
+    height:48px;
+
+    padding:12px;
+
+    border-radius:14px;
+
+    background:rgba(255,255,255,.15);
+
+    backdrop-filter:blur(10px);
+}
+
+/* ======================================================
+   DECORATION
+====================================================== */
+
+.bg-circle{
+
+    position:absolute;
+
+    border-radius:50%;
+
+    background:rgba(255,255,255,.08);
+
+    animation:float 8s ease-in-out infinite;
+}
+
+.circle1{
+
+    width:300px;
+    height:300px;
+
+    top:-120px;
+    left:-120px;
+}
+
+.circle2{
+
+    width:220px;
+    height:220px;
+
+    bottom:-80px;
+    right:-80px;
+}
+
+@keyframes float{
+
+    0%,100%{
+        transform:translateY(0);
+    }
+
+    50%{
+        transform:translateY(-18px);
+    }
+
+}
+
+/* ======================================================
+   RIGHT PANEL
+====================================================== */
+
+.login-right{
+
+    display:flex;
+    justify-content:center;
+    align-items:center;
+
+    padding:60px;
+
+    background:#f8fbff;
+}
+
+/* ======================================================
+   RESPONSIVE
+====================================================== */
+
+@media(max-width:1100px){
+
+    .login-wrapper{
+
+        grid-template-columns:1fr;
+    }
+
+    .login-left{
+
+        padding:55px;
+    }
+
+}
+
+@media(max-width:768px){
+
+    .login-left{
+
+        display:none;
+    }
+
+    .login-wrapper{
+
+        min-height:auto;
+    }
+
+    .login-right{
+
+        padding:30px 22px;
+    }
+
+}
+
+@media(max-width:480px){
+
+    .login-page{
+
+        padding:15px;
+    }
+
+    .login-right{
+
+        padding:20px;
+    }
+
+}

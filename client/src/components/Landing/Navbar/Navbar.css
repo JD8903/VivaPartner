@@ -1,0 +1,113 @@
+* {
+  margin: 0;
+  padding: 0;
+  box-sizing: border-box;
+}
+
+/* ===========================
+   Landing Navbar
+=========================== */
+
+.landing-navbar {
+  width: 100%;
+  position: sticky;
+  top: 0;
+  z-index: 1000;
+  background: rgba(15, 23, 42, 0.95);
+  backdrop-filter: blur(12px);
+  box-shadow: 0 2px 15px rgba(0, 0, 0, 0.1);
+}
+
+.landing-navbar-container {
+  max-width: 1300px;
+  margin: auto;
+  padding: 18px 40px;
+
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+}
+
+.landing-logo {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+
+  color: white;
+  font-size: 24px;
+  font-weight: 700;
+  cursor: pointer;
+}
+
+.landing-logo-icon {
+  color: #2563eb;
+  font-size: 28px;
+}
+
+.landing-nav-links {
+  display: flex;
+  align-items: center;
+  gap: 45px;
+}
+
+.landing-nav-links a {
+  color: white;
+  text-decoration: none;
+  transition: 0.3s;
+  font-weight: 500;
+}
+
+.landing-nav-links a:hover {
+  color: #38bdf8;
+}
+
+.landing-login-btn {
+  padding: 10px 22px;
+  border: none;
+  border-radius: 8px;
+  background: #2563eb;
+  color: white;
+  cursor: pointer;
+  font-weight: 600;
+  transition: 0.3s;
+}
+
+.landing-login-btn:hover {
+  background: #1d4ed8;
+}
+
+.landing-menu-icon {
+  display: none;
+  color: white;
+  font-size: 28px;
+  cursor: pointer;
+}
+
+/* ===========================
+   Responsive
+=========================== */
+
+@media (max-width: 900px) {
+  .landing-menu-icon {
+    display: block;
+  }
+
+  .landing-nav-links {
+    position: absolute;
+    top: 80px;
+    left: -100%;
+    width: 100%;
+    background: #0f172a;
+
+    display: flex;
+    flex-direction: column;
+    gap: 24px;
+
+    padding: 30px;
+    transition: 0.3s;
+  }
+
+  .landing-nav-links.landing-active {
+    left: 0;
+  }
+}

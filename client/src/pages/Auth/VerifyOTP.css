@@ -1,0 +1,127 @@
+.verify-container {
+    min-height: 100vh;
+    background: #f5f8ff;
+    display: flex;
+    justify-content: center;
+    align-items: center;
+    padding: 20px;
+}
+
+.verify-card {
+    width: 100%;
+    max-width: 420px;
+    background: white;
+    border-radius: 16px;
+    padding: 40px;
+    box-shadow: 0 15px 35px rgba(0,0,0,.08);
+}
+
+.verify-card h1 {
+    text-align: center;
+    color: #2563eb;
+    margin-bottom: 15px;
+}
+
+.verify-card p {
+    text-align: center;
+    color: #555;
+    margin-bottom: 25px;
+    line-height: 1.6;
+}
+
+.verify-card form {
+    display: flex;
+    flex-direction: column;
+    gap: 18px;
+}
+
+.verify-card input {
+    padding: 14px;
+    border-radius: 10px;
+    border: 1px solid #d9d9d9;
+    font-size: 18px;
+    text-align: center;
+    letter-spacing: 5px;
+}
+
+.verify-card input:focus {
+    outline: none;
+    border-color: #2563eb;
+}
+
+.verify-card button {
+    padding: 14px;
+    border: none;
+    background: #2563eb;
+    color: white;
+    border-radius: 10px;
+    cursor: pointer;
+    font-size: 16px;
+    font-weight: 600;
+    transition: .3s;
+}
+
+.verify-card button:hover {
+    background: #1d4ed8;
+}
+
+.verify-card button:disabled {
+    opacity: .6;
+    cursor: not-allowed;
+}
+
+.error {
+    background: #fee2e2;
+    color: #dc2626;
+    padding: 12px;
+    border-radius: 8px;
+    margin-bottom: 20px;
+    text-align: center;
+}
+
+.back-link {
+    display: block;
+    margin-top: 20px;
+    text-align: center;
+    text-decoration: none;
+    color: #2563eb;
+}
+.success-message {
+    margin-bottom: 18px;
+    padding: 12px;
+    background: #dcfce7;
+    color: #15803d;
+    border: 1px solid #bbf7d0;
+    border-radius: 8px;
+    text-align: center;
+    font-size: 14px;
+}
+
+.resend-section {
+    margin-top: 20px;
+    text-align: center;
+}
+
+.resend-section p {
+    color: #6b7280;
+    font-size: 14px;
+}
+
+.resend-btn {
+    background: transparent;
+    border: none;
+    color: #2563eb;
+    cursor: pointer;
+    font-weight: 600;
+    font-size: 15px;
+    transition: 0.3s;
+}
+
+.resend-btn:hover {
+    text-decoration: underline;
+}
+
+.resend-btn:disabled {
+    opacity: 0.6;
+    cursor: not-allowed;
+}
