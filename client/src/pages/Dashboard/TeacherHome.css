@@ -1,0 +1,44 @@
+.teacher-home{
+    display:flex;
+    flex-direction:column;
+    gap:30px;
+    padding:25px;
+    min-height:100%;
+    background:#f8fafc;
+}
+
+.teacher-home>*{
+    animation:fadeIn .4s ease;
+}
+
+@keyframes fadeIn{
+
+from{
+    opacity:0;
+    transform:translateY(20px);
+}
+
+to{
+    opacity:1;
+    transform:translateY(0);
+}
+
+}
+
+@media(max-width:992px){
+
+.teacher-home{
+    padding:20px;
+    gap:25px;
+}
+
+}
+
+@media(max-width:768px){
+
+.teacher-home{
+    padding:15px;
+    gap:20px;
+}
+
+}

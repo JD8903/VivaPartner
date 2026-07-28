@@ -15,6 +15,13 @@ const classRoutes = require("./routes/classRoutes");
 const assignmentRoutes = require("./routes/assignmentRoutes");
 const reportsRoutes = require("./routes/reportsRoutes");
 const exportRoutes = require("./routes/exportRoutes");
+const teacherDashboardRoutes = require("./routes/teacherDashboardRoutes");
+const vivaSessionRoutes = require("./routes/vivaSessionRoutes");
+const pdfRoutes = require("./routes/pdfRoutes");
+const docxRoutes = require("./routes/docxRoutes");
+const pptxRoutes = require("./routes/pptxRoutes");
+const aiRoutes = require("./routes/aiRoutes");
+const questionRoutes = require("./routes/questionRoutes");
 
 // Connect Database
 connectDB();
@@ -39,6 +46,13 @@ app.use("/api/classes", classRoutes);
 app.use("/api/assignments", assignmentRoutes);
 app.use("/api/reports", reportsRoutes);
 app.use("/api/export", exportRoutes);
+app.use("/api/teacher", teacherDashboardRoutes);
+app.use("/api/viva-sessions", vivaSessionRoutes);
+app.use("/api/pdf", pdfRoutes);
+app.use("/api/docx", docxRoutes);
+app.use("/api/pptx", pptxRoutes);
+app.use("/api/ai", aiRoutes)
+app.use("/api/questions", questionRoutes);
 
 // =======================
 // Test Route

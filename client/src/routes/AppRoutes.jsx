@@ -33,6 +33,16 @@ import EditAssignment from "../pages/Dashboard/Assignments/EditAssignment";
 import ViewAssignment from "../pages/Dashboard/Assignments/ViewAssignment";
 import Reports from "../pages/Dashboard/Reports";
 
+import TeacherHome from "../pages/Dashboard/TeacherHome";
+import AssignedClasses from "../pages/Dashboard/AssignedClasses";
+import VivaSetup from "../pages/Dashboard/VivaSetup";
+import StudentUpload from "../pages/Dashboard/StudentUpload";
+import StudyMaterial from "../pages/Dashboard/StudyMaterial";
+import StartViva from "../pages/Dashboard/StartViva";
+import StudentPairing from "../pages/Dashboard/StudentPairing";
+import QuestionGeneration from "../pages/Dashboard/QuestionGeneration/QuestionGeneration"
+import VoiceViva from "../pages/Dashboard/VoiceViva";
+
 // Layout
 import DashboardLayout from "../layouts/DashboardLayout";
 
@@ -107,7 +117,10 @@ const AppRoutes = () => {
           {/* Assignment Management */}
           <Route path="assignments/add" element={<AddAssignment />}/>
           <Route path="assignments/edit/:id" element={<EditAssignment />}/>
-          <Route path="/admin/assignments/view/:id" element={<ViewAssignment />}/>
+          <Route
+  path="assignments/view/:id"
+  element={<ViewAssignment />}
+/>
           
           {/* Other Modules */}
           
@@ -117,14 +130,59 @@ const AppRoutes = () => {
         </Route>
 
         {/* ================= Teacher Dashboard ================= */}
-        <Route
-          path="/teacher/dashboard"
-          element={
-            <ProtectedRoute allowedRoles={["teacher"]}>
-              <Dashboard />
-            </ProtectedRoute>
-          }
-        />
+          <Route
+  path="/teacher"
+  element={
+    <ProtectedRoute allowedRoles={["teacher"]}>
+      <DashboardLayout />
+    </ProtectedRoute>
+  }
+>
+  <Route index element={<TeacherHome />} />
+  <Route path="dashboard" element={<TeacherHome />} />
+
+  <Route
+    path="assigned-classes"
+    element={<AssignedClasses />}
+  />
+
+  <Route
+    path="start-viva"
+    element={<StartViva />}
+  />
+
+  <Route
+    path="viva-setup"
+    element={<VivaSetup />}
+  />
+
+  <Route
+    path="upload-students"
+    element={<StudentUpload />}
+  />
+
+  <Route
+    path="study-material"
+    element={<StudyMaterial />}
+  />
+
+  <Route
+  path="student-pairing"
+  element={<StudentPairing />}
+/>
+
+<Route
+  path="/teacher/question-generation"
+  element={<QuestionGeneration />}
+/>
+
+<Route
+  path="/teacher/voice-viva"
+  element={<VoiceViva />}
+/>
+
+</Route>
+
 
         {/* Redirect old dashboard */}
         <Route

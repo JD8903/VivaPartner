@@ -61,11 +61,8 @@ const Login = () => {
         </div>
 
         {/* Right Side */}
-
         <div className="login-right">
-
           <LoginForm />
-
         </div>
 
       </div>

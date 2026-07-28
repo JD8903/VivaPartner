@@ -9,6 +9,8 @@ import {
   FaChartBar,
   FaSignOutAlt,
   FaGraduationCap,
+  FaClipboardList,
+  FaMicrophone,
 } from "react-icons/fa";
 
 import useAuth from "../../../hooks/useAuth";
@@ -16,7 +18,7 @@ import "./Sidebar.css";
 
 const Sidebar = ({ sidebarOpen, setSidebarOpen }) => {
   const navigate = useNavigate();
-  const { logout } = useAuth();
+  const { user, logout } = useAuth();
 
   const handleLogout = () => {
     logout();
@@ -24,7 +26,8 @@ const Sidebar = ({ sidebarOpen, setSidebarOpen }) => {
     navigate("/login");
   };
 
-  const menuItems = [
+  // ================= Admin Menu =================
+  const adminMenu = [
     {
       name: "Dashboard",
       path: "/admin/dashboard",
@@ -62,20 +65,50 @@ const Sidebar = ({ sidebarOpen, setSidebarOpen }) => {
     },
   ];
 
+  // ================= Teacher Menu =================
+  const teacherMenu = [
+    {
+      name: "Dashboard",
+      path: "/teacher/dashboard",
+      icon: <FaTachometerAlt />,
+    },
+    {
+      name: "Assigned Classes",
+      path: "/teacher/assigned-classes",
+      icon: <FaClipboardList />,
+    },
+    {
+      name: "Viva Setup",
+      path: "/teacher/viva-setup",
+      icon: <FaMicrophone />,
+    },
+  ];
+
+  const menuItems =
+    user?.role === "admin" ? adminMenu : teacherMenu;
+
   return (
     <aside className={`sidebar ${sidebarOpen ? "open" : ""}`}>
+
       {/* Logo */}
       <div className="sidebar-logo">
+
         <FaGraduationCap className="logo-icon" />
 
         <div>
           <h2>VivaPartner</h2>
-          <p>Admin Panel</p>
+          <p>
+            {user?.role === "admin"
+              ? "Admin Panel"
+              : "Teacher Panel"}
+          </p>
         </div>
+
       </div>
 
       {/* Navigation */}
       <nav className="sidebar-menu">
+
         {menuItems.map((item) => (
           <NavLink
             key={item.name}
@@ -92,8 +125,10 @@ const Sidebar = ({ sidebarOpen, setSidebarOpen }) => {
             </span>
 
             <span>{item.name}</span>
+
           </NavLink>
         ))}
+
       </nav>
 
       {/* Logout */}
@@ -104,6 +139,7 @@ const Sidebar = ({ sidebarOpen, setSidebarOpen }) => {
         <FaSignOutAlt />
         <span>Logout</span>
       </button>
+
     </aside>
   );
 };

@@ -56,4 +56,20 @@ export const getTeacherCount = async () => {
   return response.data;
 };
 
+// ============================
+// Get Assigned Classes
+// ============================
+
+export const getAssignedClasses = async () => {
+  const token = localStorage.getItem("token");
+
+  const response = await API.get("/teacher/assigned-classes", {
+    headers: {
+      Authorization: `Bearer ${token}`,
+    },
+  });
+
+  return response.data;
+};
+
 export default API;

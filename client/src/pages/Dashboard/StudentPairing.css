@@ -1,0 +1,272 @@
+/* ===========================
+   Student Pairing
+=========================== */
+
+.pairing-page{
+    padding:30px;
+    background:#f8fafc;
+    min-height:100vh;
+}
+
+.pairing-header{
+    margin-bottom:25px;
+}
+
+.pairing-header h1{
+    font-size:32px;
+    color:#1e293b;
+    margin-bottom:8px;
+}
+
+.pairing-header p{
+    color:#64748b;
+    font-size:15px;
+}
+
+/* ===========================
+   Statistics
+=========================== */
+
+.stats-container{
+    display:grid;
+    grid-template-columns:repeat(auto-fit,minmax(220px,1fr));
+    gap:20px;
+    margin-bottom:30px;
+}
+
+.stat-card{
+    background:#fff;
+    border-radius:15px;
+    padding:22px;
+    box-shadow:0 8px 25px rgba(15,23,42,.08);
+    text-align:center;
+    transition:.3s;
+}
+
+.stat-card:hover{
+    transform:translateY(-4px);
+}
+
+.stat-card h2{
+    color:#2563eb;
+    font-size:34px;
+    margin-bottom:8px;
+}
+
+.stat-card span{
+    color:#64748b;
+    font-weight:500;
+}
+
+/* ===========================
+   Pairing Options
+=========================== */
+
+.pairing-options{
+    background:#fff;
+    border-radius:16px;
+    padding:25px;
+    box-shadow:0 8px 25px rgba(15,23,42,.08);
+    margin-bottom:30px;
+}
+
+.pairing-options h2{
+    margin-bottom:20px;
+    color:#1e293b;
+}
+
+.pairing-options label{
+    display:flex;
+    align-items:center;
+    gap:12px;
+    margin-bottom:15px;
+    cursor:pointer;
+    font-size:16px;
+    color:#334155;
+}
+
+.pairing-options input[type="radio"]{
+    width:18px;
+    height:18px;
+    accent-color:#2563eb;
+}
+
+.pairing-options input[type="number"]{
+    margin-top:15px;
+    width:130px;
+    padding:10px 14px;
+    border:1px solid #cbd5e1;
+    border-radius:10px;
+    outline:none;
+    font-size:15px;
+}
+
+.pairing-options input[type="number"]:focus{
+    border-color:#2563eb;
+}
+
+/* ===========================
+   Preview
+=========================== */
+
+.preview-section{
+    background:#fff;
+    border-radius:16px;
+    padding:25px;
+    box-shadow:0 8px 25px rgba(15,23,42,.08);
+}
+
+.preview-section h2{
+    color:#1e293b;
+    margin-bottom:25px;
+}
+
+.groups-container{
+    display:grid;
+    grid-template-columns:repeat(auto-fit,minmax(260px,1fr));
+    gap:20px;
+}
+
+.group-card{
+    border:1px solid #e2e8f0;
+    border-radius:14px;
+    padding:20px;
+    transition:.3s;
+    background:#fff;
+}
+
+.group-card:hover{
+    border-color:#2563eb;
+    transform:translateY(-3px);
+}
+
+.group-card h3{
+    color:#2563eb;
+    margin-bottom:18px;
+}
+
+.student-item{
+    display:flex;
+    justify-content:space-between;
+    align-items:center;
+    padding:10px 0;
+    border-bottom:1px solid #f1f5f9;
+}
+
+.student-item:last-child{
+    border-bottom:none;
+}
+
+.student-item strong{
+    color:#1e293b;
+}
+
+.student-item span{
+    color:#64748b;
+    font-size:14px;
+}
+
+/* ===========================
+   Buttons
+=========================== */
+
+.pairing-actions{
+    display:flex;
+    justify-content:space-between;
+    margin-top:35px;
+}
+
+.pairing-actions button{
+    border:none;
+    padding:13px 30px;
+    border-radius:10px;
+    cursor:pointer;
+    font-size:15px;
+    font-weight:600;
+    transition:.3s;
+}
+
+.pairing-actions button:first-child{
+    background:#e2e8f0;
+    color:#1e293b;
+}
+
+.pairing-actions button:first-child:hover{
+    background:#cbd5e1;
+}
+
+.pairing-actions button:last-child{
+    background:#2563eb;
+    color:#fff;
+}
+
+.pairing-actions button:last-child:hover{
+    background:#1d4ed8;
+}
+
+/* ===========================
+   Responsive
+=========================== */
+
+@media(max-width:768px){
+
+    .pairing-page{
+        padding:20px;
+    }
+
+    .pairing-header h1{
+        font-size:26px;
+    }
+
+    .pairing-actions{
+        flex-direction:column;
+        gap:15px;
+    }
+
+    .pairing-actions button{
+        width:100%;
+    }
+
+}
+
+.pairing-toolbar{
+    display:flex;
+    justify-content:flex-end;
+    margin-bottom:20px;
+}
+
+.pairing-toolbar button{
+    background:#2563eb;
+    color:#fff;
+    border:none;
+    padding:10px 18px;
+    border-radius:8px;
+    cursor:pointer;
+    font-weight:600;
+}
+
+.student-actions{
+    display:flex;
+    align-items:center;
+    gap:10px;
+}
+
+.student-actions select{
+    padding:6px 10px;
+    border:1px solid #d1d5db;
+    border-radius:8px;
+    background:#fff;
+}
+
+.remove-btn{
+    background:#ef4444;
+    color:#fff;
+    border:none;
+    padding:6px 10px;
+    border-radius:8px;
+    cursor:pointer;
+}
+
+.remove-btn:hover{
+    background:#dc2626;
+}

@@ -1,0 +1,75 @@
+.teacher-welcome-card{
+    display:flex;
+    justify-content:space-between;
+    align-items:center;
+    padding:30px;
+    border-radius:20px;
+    background:linear-gradient(135deg,#2563eb,#1d4ed8);
+    color:#fff;
+    box-shadow:0 15px 35px rgba(37,99,235,.25);
+    flex-wrap:wrap;
+    gap:20px;
+}
+
+.teacher-left h2{
+    font-size:32px;
+    margin-bottom:10px;
+    font-weight:700;
+}
+
+.teacher-left p{
+    opacity:.9;
+    margin-bottom:25px;
+}
+
+.teacher-info{
+    display:flex;
+    gap:15px;
+    flex-wrap:wrap;
+}
+
+.info-box{
+    display:flex;
+    align-items:center;
+    gap:10px;
+    padding:12px 18px;
+    background:rgba(255,255,255,.15);
+    border-radius:12px;
+    backdrop-filter:blur(8px);
+}
+
+.teacher-avatar{
+    display:flex;
+    justify-content:center;
+    align-items:center;
+}
+
+.avatar-circle{
+    width:90px;
+    height:90px;
+    border-radius:50%;
+    background:#fff;
+    color:#2563eb;
+    display:flex;
+    justify-content:center;
+    align-items:center;
+    font-size:34px;
+    font-weight:700;
+}
+
+@media(max-width:768px){
+
+.teacher-welcome-card{
+    text-align:center;
+    justify-content:center;
+}
+
+.teacher-info{
+    justify-content:center;
+}
+
+.teacher-left h2{
+    font-size:26px;
+}
+
+}
