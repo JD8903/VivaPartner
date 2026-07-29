@@ -22,6 +22,9 @@ const docxRoutes = require("./routes/docxRoutes");
 const pptxRoutes = require("./routes/pptxRoutes");
 const aiRoutes = require("./routes/aiRoutes");
 const questionRoutes = require("./routes/questionRoutes");
+const studentRoutes = require("./routes/studentRoutes");
+const studentGroupRoutes = require("./routes/studentGroupRoutes");
+
 
 // Connect Database
 connectDB();
@@ -53,6 +56,9 @@ app.use("/api/docx", docxRoutes);
 app.use("/api/pptx", pptxRoutes);
 app.use("/api/ai", aiRoutes)
 app.use("/api/questions", questionRoutes);
+app.use("/api/students", studentRoutes);
+app.use("/api/student-groups",studentGroupRoutes);
+
 
 // =======================
 // Test Route

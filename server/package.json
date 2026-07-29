@@ -27,6 +27,7 @@
     "multer": "^2.2.0",
     "nodemailer": "^9.0.3",
     "pdf-parse": "^2.4.5",
-    "pptx2json": "^0.0.10"
+    "pptx2json": "^0.0.10",
+    "xlsx": "^0.18.5"
   }
 }

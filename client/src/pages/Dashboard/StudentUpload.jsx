@@ -2,16 +2,25 @@ import { useState, useEffect } from "react";
 import { useNavigate } from "react-router-dom";
 import * as XLSX from "xlsx";
 import { validateStudents } from "../../utils/studentValidation";
+import { uploadStudents } from "../../services/studentApi";
 import "./StudentUpload.css";
 
 const StudentUpload = () => {
   const navigate = useNavigate();
 
   const [selectedClass, setSelectedClass] = useState(null);
+
   const [file, setFile] = useState(null);
+
   const [students, setStudents] = useState([]);
+
   const [validationErrors, setValidationErrors] = useState([]);
+
   const [error, setError] = useState("");
+
+  const [uploading, setUploading] = useState(false);
+
+  const [uploadProgress, setUploadProgress] = useState(0);
 
   useEffect(() => {
     const storedClass = localStorage.getItem("selectedClass");
@@ -51,12 +60,11 @@ const StudentUpload = () => {
           type: "array",
         });
 
-        const sheetName = workbook.SheetNames[0];
-
-        const worksheet = workbook.Sheets[sheetName];
+        const worksheet =
+          workbook.Sheets[workbook.SheetNames[0]];
 
         const jsonData = XLSX.utils.sheet_to_json(worksheet, {
-        defval: "",
+          defval: "",
         });
 
         const result = validateStudents(jsonData);
@@ -65,9 +73,11 @@ const StudentUpload = () => {
         setValidationErrors(result.errors);
 
         if (result.errors.length > 0) {
-        setError("Excel validation failed. Please check the errors below.");
+          setError(
+            "Excel validation failed. Please check the errors below."
+          );
         } else {
-        setError("");
+          setError("");
         }
       } catch (err) {
         console.error(err);
@@ -78,14 +88,15 @@ const StudentUpload = () => {
     reader.readAsArrayBuffer(selectedFile);
   };
 
-    const handleRemove = () => {
+  const handleRemove = () => {
     setFile(null);
     setStudents([]);
     setValidationErrors([]);
     setError("");
-    };
+    setUploadProgress(0);
+  };
 
-  const handleContinue = () => {
+  const handleContinue = async () => {
     if (!file) {
       setError("Please upload an Excel file first.");
       return;
@@ -96,24 +107,62 @@ const StudentUpload = () => {
       return;
     }
 
-    localStorage.setItem(
-      "studentExcel",
-      JSON.stringify({
-        fileName: file.name,
-        fileSize: file.size,
-        fileType: file.type,
-      })
-    );
+    if (validationErrors.length > 0) {
+      setError("Please fix the validation errors first.");
+      return;
+    }
 
-    localStorage.setItem(
-      "students",
-      JSON.stringify(students)
-    );
+    try {
+      setUploading(true);
+      setUploadProgress(0);
 
-    navigate("/teacher/study-material");
+      const formData = new FormData();
+
+      // IMPORTANT
+      formData.append("excel", file);
+
+      formData.append(
+        "classId",
+        selectedClass?.class?._id || ""
+      );
+
+      formData.append(
+        "teacher",
+        selectedClass?.teacher?._id || ""
+      );
+
+      const response = await uploadStudents(
+        formData,
+        (progressEvent) => {
+          const percent = Math.round(
+            (progressEvent.loaded * 100) /
+              progressEvent.total
+          );
+
+          setUploadProgress(percent);
+        }
+      );
+
+      if (!response.data.success) {
+        throw new Error(response.data.message);
+      }
+
+      localStorage.removeItem("students");
+
+      navigate("/teacher/student-pairing");
+
+    } catch (err) {
+      console.error(err);
+
+      setError(
+        err.response?.data?.message ||
+          "Failed to upload students."
+      );
+    } finally {
+      setUploading(false);
+    }
   };
-
-  return (
+    return (
     <div className="student-upload-page">
       <div className="upload-header">
         <h1>Student Excel Upload</h1>
@@ -154,6 +203,7 @@ const StudentUpload = () => {
           type="file"
           accept=".xlsx,.xls"
           onChange={handleFileChange}
+          disabled={uploading}
         />
 
         {file && (
@@ -169,9 +219,31 @@ const StudentUpload = () => {
             <button
               className="remove-btn"
               onClick={handleRemove}
+              disabled={uploading}
             >
               Remove
             </button>
+          </div>
+        )}
+
+        {uploading && (
+          <div
+            style={{
+              marginTop: "20px",
+            }}
+          >
+            <p>
+              Uploading Students... {uploadProgress}%
+            </p>
+
+            <progress
+              value={uploadProgress}
+              max="100"
+              style={{
+                width: "100%",
+                height: "10px",
+              }}
+            />
           </div>
         )}
 
@@ -193,37 +265,36 @@ const StudentUpload = () => {
             >
               <table className="student-table">
                 <thead>
-                    <tr>
-                        <th>#</th>
-                        <th>Enrollment Number</th>
-                        <th>Student Name</th>
-                    </tr>
-                    </thead>
+                  <tr>
+                    <th>#</th>
+                    <th>Enrollment Number</th>
+                    <th>Student Name</th>
+                  </tr>
+                </thead>
 
-                    <tbody>
-                    {students.map((student, index) => (
-                        <tr key={index}>
-                        <td>{index + 1}</td>
-                        <td>{student.enrollmentNo}</td>
-                        <td>{student.studentName}</td>
-                        </tr>
-                    ))}
-                    </tbody>
+                <tbody>
+                  {students.map((student, index) => (
+                    <tr key={index}>
+                      <td>{index + 1}</td>
+                      <td>{student.enrollmentNo}</td>
+                      <td>{student.studentName}</td>
+                    </tr>
+                  ))}
+                </tbody>
               </table>
             </div>
           </>
         )}
+                {validationErrors.length > 0 && (
+          <div className="validation-box">
+            <h3>Validation Errors</h3>
 
-        {validationErrors.length > 0 && (
-            <div className="validation-box">
-                <h3>Validation Errors</h3>
-
-                <ul>
-                {validationErrors.map((err, index) => (
-                    <li key={index}>{err}</li>
-                ))}
-                </ul>
-            </div>
+            <ul>
+              {validationErrors.map((err, index) => (
+                <li key={index}>{err}</li>
+              ))}
+            </ul>
+          </div>
         )}
 
         {error && (
@@ -236,6 +307,7 @@ const StudentUpload = () => {
           <button
             className="back-btn"
             onClick={() => navigate("/teacher/viva-setup")}
+            disabled={uploading}
           >
             ← Back
           </button>
@@ -243,8 +315,14 @@ const StudentUpload = () => {
           <button
             className="continue-btn"
             onClick={handleContinue}
+            disabled={
+              uploading ||
+              !file ||
+              students.length === 0 ||
+              validationErrors.length > 0
+            }
           >
-            Continue →
+            {uploading ? "Uploading..." : "Continue →"}
           </button>
         </div>
       </div>

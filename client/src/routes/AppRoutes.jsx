@@ -42,6 +42,8 @@ import StartViva from "../pages/Dashboard/StartViva";
 import StudentPairing from "../pages/Dashboard/StudentPairing";
 import QuestionGeneration from "../pages/Dashboard/QuestionGeneration/QuestionGeneration"
 import VoiceViva from "../pages/Dashboard/VoiceViva";
+import StudentManagement from "../pages/Dashboard/Teachers/StudentManagement";
+
 
 // Layout
 import DashboardLayout from "../layouts/DashboardLayout";
@@ -180,6 +182,12 @@ const AppRoutes = () => {
   path="/teacher/voice-viva"
   element={<VoiceViva />}
 />
+
+<Route
+  path="/teacher/students"
+  element={<StudentManagement />}
+/>
+
 
 </Route>
 
