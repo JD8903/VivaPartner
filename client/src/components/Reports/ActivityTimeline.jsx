@@ -11,20 +11,26 @@ import ActivitySkeleton from "./ActivitySkeleton";
 
 const ActivityTimeline = ({
   loading,
-  activities,
+  activities = {},
 }) => {
   if (loading) {
     return (
-      <div className="activity-timeline">
+      <>
         {[...Array(5)].map((_, index) => (
           <ActivitySkeleton key={index} />
         ))}
-      </div>
+      </>
     );
   }
 
+  const teachers = activities?.teachers || [];
+  const departments = activities?.departments || [];
+  const subjects = activities?.subjects || [];
+  const classes = activities?.classes || [];
+  const assignments = activities?.assignments || [];
+
   const activityList = [
-    ...activities.teachers.map((teacher) => ({
+    ...teachers.map((teacher) => ({
       id: teacher._id,
       icon: <FaUserTie />,
       title: "Teacher Added",
@@ -32,7 +38,7 @@ const ActivityTimeline = ({
       date: teacher.createdAt,
     })),
 
-    ...activities.departments.map((department) => ({
+    ...departments.map((department) => ({
       id: department._id,
       icon: <FaBuilding />,
       title: "Department Created",
@@ -40,7 +46,7 @@ const ActivityTimeline = ({
       date: department.createdAt,
     })),
 
-    ...activities.subjects.map((subject) => ({
+    ...subjects.map((subject) => ({
       id: subject._id,
       icon: <FaBook />,
       title: "Subject Added",
@@ -48,7 +54,7 @@ const ActivityTimeline = ({
       date: subject.createdAt,
     })),
 
-    ...activities.classes.map((cls) => ({
+    ...classes.map((cls) => ({
       id: cls._id,
       icon: <FaSchool />,
       title: "Class Created",
@@ -56,11 +62,13 @@ const ActivityTimeline = ({
       date: cls.createdAt,
     })),
 
-    ...activities.assignments.map((assignment) => ({
+    ...assignments.map((assignment) => ({
       id: assignment._id,
       icon: <FaClipboardList />,
       title: "Assignment Created",
-      description: `${assignment.teacher?.name || "Teacher"} assigned to ${assignment.class?.name || "Class"}`,
+      description: `${assignment.teacher?.name || "Teacher"} assigned to ${
+        assignment.class?.name || "Class"
+      }`,
       date: assignment.createdAt,
     })),
   ];

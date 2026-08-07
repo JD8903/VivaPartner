@@ -1,5 +1,6 @@
 import { useEffect, useState } from "react";
 import { useNavigate } from "react-router-dom";
+
 import { generateQuestions } from "../../../services/aiApi";
 import { saveQuestionsToDB } from "../../../services/questionApi";
 
@@ -52,6 +53,10 @@ TXT Content:
 ${txt}
 `;
 
+      console.log("========== STUDY CONTENT ==========");
+      console.log(studyContent);
+      console.log("===================================");
+
       if (studyContent.trim() === "") {
         setError("No study material found.");
         setLoading(false);
@@ -64,21 +69,44 @@ ${txt}
         questionCount: viva.questionCount || 10,
       });
 
-      if (response.success) {
+      // ============================================
+      // DEBUG LOGS
+      // ============================================
+
+      console.log("========== FRONTEND RESPONSE ==========");
+      console.log(response);
+      console.log("Success:", response.success);
+      console.log("Questions:", response.questions);
+      console.log("Total:", response.questions?.length);
+      console.log("=======================================");
+
+      if (
+        response &&
+        response.success &&
+        Array.isArray(response.questions)
+      ) {
         setQuestions(response.questions);
 
         localStorage.setItem(
           "generatedQuestions",
           JSON.stringify(response.questions)
         );
+
+        console.log("Questions loaded successfully.");
       } else {
-        setError(response.message || "Failed to generate questions.");
+        console.error("Invalid response:", response);
+
+        setError(
+          response?.message ||
+            "AI returned an invalid response."
+        );
       }
     } catch (err) {
-      console.error(err);
+      console.error("Generate Question Error:", err);
 
       setError(
         err.response?.data?.message ||
+          err.message ||
           "Something went wrong while generating questions."
       );
     } finally {
@@ -136,8 +164,7 @@ ${txt}
 
     setNewQuestion("");
   };
-
-  // ============================================
+    // ============================================
   // Save Questions to Database
   // ============================================
 
@@ -157,14 +184,28 @@ ${txt}
 
       const payload = {
         teacher: teacher._id || teacher.id || "",
-        classId: selectedClass._id || "",
-        subject: selectedClass.subject || "",
+        classId:
+          selectedClass.class?._id ||
+          selectedClass._id ||
+          "",
+        subject:
+          selectedClass.subject?.name ||
+          selectedClass.subject ||
+          "",
         topic: study.topic || "",
         difficulty: viva.difficulty || "Medium",
         questions,
       };
 
+      console.log("========== SAVE PAYLOAD ==========");
+      console.log(payload);
+      console.log("==================================");
+
       const response = await saveQuestionsToDB(payload);
+
+      console.log("========== SAVE RESPONSE ==========");
+      console.log(response);
+      console.log("===================================");
 
       if (response.success) {
         localStorage.setItem(
@@ -172,30 +213,43 @@ ${txt}
           JSON.stringify(questions)
         );
 
-        alert("Questions saved successfully to database.");
+        alert("Questions saved successfully.");
       } else {
         alert(response.message);
       }
     } catch (err) {
-      console.error(err);
+      console.error("Save Error:", err);
 
       alert(
         err.response?.data?.message ||
+          err.message ||
           "Unable to save questions."
       );
     }
   };
 
-  const startVoiceViva = async () => {
-  try {
-    await saveQuestions();
+  // ============================================
+  // Continue to Voice Viva
+  // ============================================
 
-    navigate("/teacher/voice-viva");
-  } catch (err) {
-    console.error(err);
-    alert("Please save the questions before continuing.");
-  }
-};
+  const startVoiceViva = async () => {
+    try {
+      await saveQuestions();
+
+      localStorage.setItem(
+        "generatedQuestions",
+        JSON.stringify(questions)
+      );
+
+      navigate("/teacher/voice-viva");
+    } catch (err) {
+      console.error(err);
+
+      alert(
+        "Please save the questions before continuing."
+      );
+    }
+  };
 
   // ============================================
   // Loading
@@ -229,11 +283,28 @@ ${txt}
         }}
       >
         <h2>Error</h2>
+
         <p>{error}</p>
+
+        <button
+          onClick={generateAIQuestions}
+          style={{
+            marginTop: "20px",
+            background: "#2563eb",
+            color: "#fff",
+            border: "none",
+            padding: "12px 24px",
+            borderRadius: "8px",
+            cursor: "pointer",
+          }}
+        >
+          🔄 Try Again
+        </button>
       </div>
     );
   }
-    return (
+
+  return (
     <div
       style={{
         maxWidth: "1000px",
@@ -241,7 +312,11 @@ ${txt}
         padding: "20px",
       }}
     >
-      <h1 style={{ marginBottom: "10px" }}>
+      <h1
+        style={{
+          marginBottom: "10px",
+        }}
+      >
         Generated Viva Questions
       </h1>
 
@@ -251,8 +326,8 @@ ${txt}
           marginBottom: "25px",
         }}
       >
-        Review, edit, add, delete and save the questions before starting
-        the AI Voice Viva.
+        Review, edit, add, delete and save the
+        questions before starting the AI Voice Viva.
       </p>
 
       {/* Summary */}
@@ -299,7 +374,8 @@ ${txt}
             <div
               style={{
                 display: "flex",
-                justifyContent: "space-between",
+                justifyContent:
+                  "space-between",
                 alignItems: "center",
                 marginBottom: "15px",
               }}
@@ -324,7 +400,10 @@ ${txt}
               rows={3}
               value={q.question}
               onChange={(e) =>
-                editQuestion(q.id, e.target.value)
+                editQuestion(
+                  q.id,
+                  e.target.value
+                )
               }
               style={{
                 width: "100%",
@@ -346,7 +425,9 @@ ${txt}
               }}
             >
               <button
-                onClick={() => deleteQuestion(q.id)}
+                onClick={() =>
+                  deleteQuestion(q.id)
+                }
                 style={{
                   background: "#dc2626",
                   color: "#fff",
@@ -363,8 +444,9 @@ ${txt}
           </div>
         ))
       )}
-
+            {/* ============================================ */}
       {/* Add Question */}
+      {/* ============================================ */}
 
       <div
         style={{
@@ -413,7 +495,9 @@ ${txt}
         </button>
       </div>
 
+      {/* ============================================ */}
       {/* Bottom Buttons */}
+      {/* ============================================ */}
 
       <div
         style={{
@@ -455,19 +539,26 @@ ${txt}
         </button>
 
         <button
-  onClick={startVoiceViva}
-  style={{
-    background: "#16a34a",
-    color: "#fff",
-    border: "none",
-    padding: "12px 24px",
-    borderRadius: "8px",
-    cursor: "pointer",
-    fontWeight: "600",
-  }}
->
-  ▶ Start Voice Viva
-</button>
+          onClick={startVoiceViva}
+          disabled={questions.length === 0}
+          style={{
+            background:
+              questions.length === 0
+                ? "#94a3b8"
+                : "#16a34a",
+            color: "#fff",
+            border: "none",
+            padding: "12px 24px",
+            borderRadius: "8px",
+            cursor:
+              questions.length === 0
+                ? "not-allowed"
+                : "pointer",
+            fontWeight: "600",
+          }}
+        >
+          ▶ Start Voice Viva
+        </button>
       </div>
     </div>
   );

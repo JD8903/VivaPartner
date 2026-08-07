@@ -1,4 +1,5 @@
 import "./Hero.css";
+import { useNavigate } from "react-router-dom";
 import {
   FaMicrophoneAlt,
   FaFilePdf,
@@ -8,13 +9,27 @@ import {
 } from "react-icons/fa";
 
 const Hero = () => {
-  return (
-    <section className="hero" id="home">
-      <div className="hero-container">
+  const navigate = useNavigate();
 
+  const handleGetStarted = () => {
+    const section = document.getElementById("features");
+
+    if (section) {
+      section.scrollIntoView({
+        behavior: "smooth",
+      });
+    }
+  };
+
+  const handleTeacherLogin = () => {
+    navigate("/login");
+  };
+
+  return (
+    <section className="hero-section" id="home">
+      <div className="hero-container">
         {/* Left Side */}
         <div className="hero-content">
-
           <span className="hero-badge">
             🚀 AI Powered Viva Examination Platform
           </span>
@@ -33,18 +48,23 @@ const Hero = () => {
           </p>
 
           <div className="hero-buttons">
-            <button className="primary-btn">
+            <button
+              className="primary-btn"
+              onClick={handleGetStarted}
+            >
               Get Started
               <FaArrowRight />
             </button>
 
-            <button className="secondary-btn">
+            <button
+              className="secondary-btn"
+              onClick={handleTeacherLogin}
+            >
               Teacher Login
             </button>
           </div>
 
           <div className="hero-stats">
-
             <div className="stat-card">
               <h3>AI Voice</h3>
               <p>Interactive Viva</p>
@@ -59,15 +79,11 @@ const Hero = () => {
               <h3>Instant</h3>
               <p>Evaluation</p>
             </div>
-
           </div>
-
         </div>
 
         {/* Right Side */}
-
         <div className="hero-dashboard">
-
           <div className="glass-card card1">
             <FaMicrophoneAlt />
             <div>
@@ -99,9 +115,7 @@ const Hero = () => {
               <p>Marks Generated</p>
             </div>
           </div>
-
         </div>
-
       </div>
     </section>
   );

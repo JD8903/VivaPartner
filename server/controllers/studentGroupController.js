@@ -1,6 +1,9 @@
 const Student = require("../models/Student");
 
-// Fisher-Yates Shuffle
+// ====================================
+// Shuffle Students
+// ====================================
+
 const shuffleStudents = (students) => {
   const shuffled = [...students];
 
@@ -16,9 +19,31 @@ const shuffleStudents = (students) => {
   return shuffled;
 };
 
+// ====================================
+// Generate Student Groups
+// ====================================
+
 const generateGroups = async (req, res) => {
   try {
     const { classId, studentsPerViva } = req.body;
+
+    console.log("\n===============================");
+    console.log("Generate Student Groups");
+    console.log("===============================");
+    console.log("Requested Class ID :", classId);
+    console.log("Students Per Viva  :", studentsPerViva);
+
+    const allStudents = await Student.find();
+
+    console.log("\nAll Students In Database");
+
+    allStudents.forEach((student) => {
+      console.log({
+        name: student.name,
+        enrollment: student.enrollment,
+        classId: student.classId,
+      });
+    });
 
     if (!classId || !studentsPerViva) {
       return res.status(400).json({
@@ -40,10 +65,13 @@ const generateGroups = async (req, res) => {
       classId,
     });
 
+    console.log("\nMatched Students :", students.length);
+
     if (students.length === 0) {
       return res.status(404).json({
         success: false,
-        message: "No students found for this class.",
+        message:
+          "No students found for this class.\nCheck that uploaded students belong to the selected class.",
       });
     }
 
@@ -76,12 +104,14 @@ const generateGroups = async (req, res) => {
       studentsPerViva: limit,
       groups,
     });
+
   } catch (error) {
     console.error(error);
 
     return res.status(500).json({
       success: false,
       message: "Failed to generate student groups.",
+      error: error.message,
     });
   }
 };

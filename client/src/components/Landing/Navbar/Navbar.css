@@ -4,77 +4,119 @@
   box-sizing: border-box;
 }
 
-/* ===========================
-   Landing Navbar
-=========================== */
+/* ==============================
+   Navbar
+============================== */
 
 .landing-navbar {
-  width: 100%;
   position: sticky;
   top: 0;
   z-index: 1000;
+  width: 100%;
   background: rgba(15, 23, 42, 0.95);
   backdrop-filter: blur(12px);
-  box-shadow: 0 2px 15px rgba(0, 0, 0, 0.1);
+  border-bottom: 1px solid rgba(255,255,255,.08);
 }
 
 .landing-navbar-container {
-  max-width: 1300px;
+  max-width: 1400px;
+  height: 80px;
   margin: auto;
-  padding: 18px 40px;
+  padding: 0 45px;
 
   display: flex;
   justify-content: space-between;
   align-items: center;
 }
 
+/* ==============================
+   Logo
+============================== */
+
 .landing-logo {
   display: flex;
   align-items: center;
-  gap: 10px;
+  gap: 12px;
 
+  text-decoration: none;
   color: white;
-  font-size: 24px;
+  font-size: 34px;
   font-weight: 700;
-  cursor: pointer;
 }
 
 .landing-logo-icon {
-  color: #2563eb;
-  font-size: 28px;
+  color: #3b82f6;
+  font-size: 30px;
 }
+
+/* ==============================
+   Navigation
+============================== */
 
 .landing-nav-links {
   display: flex;
   align-items: center;
-  gap: 45px;
+  gap: 35px;
 }
 
 .landing-nav-links a {
-  color: white;
+  color: rgba(255,255,255,.85);
   text-decoration: none;
-  transition: 0.3s;
+  font-size: 17px;
   font-weight: 500;
+  transition: .3s;
+  position: relative;
 }
 
 .landing-nav-links a:hover {
-  color: #38bdf8;
+  color: white;
 }
 
+.landing-nav-links a::after {
+  content: "";
+  position: absolute;
+  left: 0;
+  bottom: -8px;
+
+  width: 0%;
+  height: 2px;
+
+  background: #3b82f6;
+  transition: .3s;
+}
+
+.landing-nav-links a:hover::after {
+  width: 100%;
+}
+
+/* ==============================
+   Login Button
+============================== */
+
 .landing-login-btn {
-  padding: 10px 22px;
+  padding: 12px 28px;
   border: none;
-  border-radius: 8px;
+  border-radius: 999px;
+
   background: #2563eb;
   color: white;
-  cursor: pointer;
+
+  font-size: 16px;
   font-weight: 600;
-  transition: 0.3s;
+
+  cursor: pointer;
+  transition: .3s;
 }
 
 .landing-login-btn:hover {
   background: #1d4ed8;
+  transform: translateY(-2px);
+  box-shadow: 0 10px 25px rgba(37,99,235,.35);
 }
+
+/* ==============================
+   Mobile Menu
+============================== */
 
 .landing-menu-icon {
   display: none;
@@ -83,11 +125,12 @@
   cursor: pointer;
 }
 
-/* ===========================
+/* ==============================
    Responsive
-=========================== */
+============================== */
 
 @media (max-width: 900px) {
+
   .landing-menu-icon {
     display: block;
   }
@@ -96,18 +139,23 @@
     position: absolute;
     top: 80px;
     left: -100%;
+
     width: 100%;
     background: #0f172a;
 
-    display: flex;
     flex-direction: column;
-    gap: 24px;
+    gap: 22px;
 
     padding: 30px;
-    transition: 0.3s;
+
+    transition: .3s;
   }
 
   .landing-nav-links.landing-active {
     left: 0;
+  }
+
+  .landing-login-btn {
+    width: 100%;
   }
 }

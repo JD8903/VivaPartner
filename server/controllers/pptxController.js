@@ -1,39 +1,44 @@
 const fs = require("fs");
-const pptx2json = require("pptx2json");
+const officeParser = require("officeparser");
 
 const extractPPTX = async (req, res) => {
   try {
     if (!req.file) {
       return res.status(400).json({
         success: false,
-        message: "No PPTX uploaded",
+        message: "No PPTX uploaded.",
       });
     }
 
-    const presentation = await pptx2json.parse(req.file.path);
+    // Parse the PPTX file
+    const ast = await officeParser.parseOffice(req.file.path);
 
-    let text = "";
+    // Convert parsed content to plain text
+    const result = await ast.to("text");
 
-    presentation.slides.forEach((slide) => {
-      slide.elements.forEach((element) => {
-        if (element.text) {
-          text += element.text + "\n";
-        }
-      });
+    // Delete uploaded file
+    fs.unlink(req.file.path, (err) => {
+      if (err) {
+        console.error("Failed to delete uploaded PPTX:", err);
+      }
     });
 
-    fs.unlink(req.file.path, () => {});
-
-    res.json({
+    return res.status(200).json({
       success: true,
-      text,
+      text: result.value || "",
     });
-  } catch (error) {
-    console.error(error);
 
-    res.status(500).json({
+  } catch (error) {
+    console.error("PPTX Extraction Error:", error);
+
+    if (req.file && fs.existsSync(req.file.path)) {
+      fs.unlink(req.file.path, () => {});
+    }
+
+    return res.status(500).json({
       success: false,
-      message: "Failed to extract PPTX",
+      message: "Failed to extract PPTX.",
+      error: error.message,
     });
   }
 };
