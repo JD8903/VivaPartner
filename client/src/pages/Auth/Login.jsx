@@ -1,9 +1,11 @@
 import LoginForm from "../../components/Auth/LoginForm/LoginForm";
+
 import {
   FaRobot,
   FaMicrophoneAlt,
   FaChartLine,
 } from "react-icons/fa";
+
 import "./Login.css";
 
 const Login = () => {
@@ -11,7 +13,10 @@ const Login = () => {
     <section className="login-page">
       <div className="login-wrapper">
 
-        {/* Left Side */}
+        {/* ==================================================
+            LEFT SIDE
+        ================================================== */}
+
         <div className="login-left">
 
           <div className="bg-circle circle1"></div>
@@ -32,35 +37,42 @@ const Login = () => {
             </h1>
 
             <p className="tagline">
-              Conduct smarter viva examinations with AI-powered
-              question generation, voice interaction and automatic
-              evaluation.
+              Conduct smarter viva examinations with
+              AI-powered question generation, voice
+              interaction and automatic evaluation.
             </p>
 
             <div className="feature-list">
 
               <div className="feature-item">
                 <FaRobot />
-                <span>AI Question Generation</span>
+                <span>
+                  AI Question Generation
+                </span>
               </div>
 
               <div className="feature-item">
                 <FaMicrophoneAlt />
-                <span>Voice Based Viva</span>
+                <span>
+                  Voice Based Viva
+                </span>
               </div>
 
               <div className="feature-item">
                 <FaChartLine />
-                <span>Automatic Evaluation</span>
+                <span>
+                  Automatic Evaluation
+                </span>
               </div>
 
             </div>
-
           </div>
-
         </div>
 
-        {/* Right Side */}
+        {/* ==================================================
+            RIGHT SIDE
+        ================================================== */}
+
         <div className="login-right">
           <LoginForm />
         </div>

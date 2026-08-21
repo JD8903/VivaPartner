@@ -1,7 +1,11 @@
 import { useState } from "react";
+
 import { Link, useNavigate } from "react-router-dom";
+
 import toast from "react-hot-toast";
+
 import useAuth from "../../../hooks/useAuth";
+
 import {
   FaEye,
   FaEyeSlash,
@@ -10,17 +14,17 @@ import {
   FaShieldAlt,
 } from "react-icons/fa";
 
-import RoleSelector from "../RoleSelector/RoleSelector";
 import api from "../../../services/api";
 
 import "./LoginForm.css";
 
 const LoginForm = () => {
   const navigate = useNavigate();
+
   const { login } = useAuth();
 
-  const [selectedRole, setSelectedRole] = useState("teacher");
-  const [showPassword, setShowPassword] = useState(false);
+  const [showPassword, setShowPassword] =
+    useState(false);
 
   const [formData, setFormData] = useState({
     email: "",
@@ -29,16 +33,32 @@ const LoginForm = () => {
   });
 
   const [errors, setErrors] = useState({});
-  const [loading, setLoading] = useState(false);
 
-  const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+  const [loading, setLoading] =
+    useState(false);
+
+  const emailRegex =
+    /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+
+  // ======================================================
+  // HANDLE INPUT CHANGE
+  // ======================================================
 
   const handleChange = (e) => {
-    const { name, value, type, checked } = e.target;
+    const {
+      name,
+      value,
+      type,
+      checked,
+    } = e.target;
 
     setFormData((prev) => ({
       ...prev,
-      [name]: type === "checkbox" ? checked : value,
+
+      [name]:
+        type === "checkbox"
+          ? checked
+          : value,
     }));
 
     if (errors[name]) {
@@ -49,125 +69,275 @@ const LoginForm = () => {
     }
   };
 
+  // ======================================================
+  // VALIDATE FORM
+  // ======================================================
+
   const validateRequiredFields = () => {
     const newErrors = {};
 
-    const email = formData.email.trim();
+    const email =
+      formData.email.trim();
 
     if (!email) {
-      newErrors.email = "Email is required.";
-    } else if (!emailRegex.test(email)) {
-      newErrors.email = "Please enter a valid email address.";
+      newErrors.email =
+        "Email is required.";
+    } else if (
+      !emailRegex.test(email)
+    ) {
+      newErrors.email =
+        "Please enter a valid email address.";
     }
 
     if (!formData.password.trim()) {
-      newErrors.password = "Password is required.";
-    } else if (formData.password.length < 6) {
+      newErrors.password =
+        "Password is required.";
+    } else if (
+      formData.password.length < 6
+    ) {
       newErrors.password =
         "Password must be at least 6 characters.";
-    } else if (formData.password.length > 32) {
+    } else if (
+      formData.password.length > 32
+    ) {
       newErrors.password =
         "Password cannot exceed 32 characters.";
     }
 
     setErrors(newErrors);
 
-    return Object.keys(newErrors).length === 0;
+    return (
+      Object.keys(newErrors).length === 0
+    );
   };
+
+  // ======================================================
+  // LOGIN
+  // ======================================================
 
   const handleSubmit = async (e) => {
     e.preventDefault();
 
-    if (!validateRequiredFields()) return;
+    if (!validateRequiredFields()) {
+      return;
+    }
 
     try {
       setLoading(true);
 
-      const { data } = await api.post("/auth/login", {
-        email: formData.email.trim().toLowerCase(),
-        password: formData.password,
-      });
+      const { data } = await api.post(
+        "/auth/login",
+        {
+          email:
+            formData.email
+              .trim()
+              .toLowerCase(),
 
-      // Validate selected role
-      if (selectedRole !== data.user.role) {
-        toast.error(
-          `This account belongs to the ${data.user.role} role. Please select the correct role.`
+          password:
+            formData.password,
+        }
+      );
+
+      // ==================================================
+      // VALIDATE LOGIN RESPONSE
+      // ==================================================
+
+      if (
+        !data ||
+        !data.token ||
+        !data.user
+      ) {
+        throw new Error(
+          "Invalid login response from server."
         );
+      }
+
+      // ==================================================
+      // GET ROLE FROM BACKEND
+      //
+      // NO MANUAL ROLE SELECTION.
+      // ==================================================
+
+      const userRole =
+        String(
+          data.user.role || ""
+        )
+          .trim()
+          .toLowerCase();
+
+      if (!userRole) {
+        throw new Error(
+          "User role was not provided by the server."
+        );
+      }
+
+      // ==================================================
+      // SAVE LOGIN
+      // ==================================================
+
+      login(
+        data.token,
+        data.user
+      );
+
+      // ==================================================
+      // REMEMBER ME
+      // ==================================================
+
+      if (formData.remember) {
+        localStorage.setItem(
+          "rememberEmail",
+          formData.email
+            .trim()
+            .toLowerCase()
+        );
+      } else {
+        localStorage.removeItem(
+          "rememberEmail"
+        );
+      }
+
+      toast.success(
+        "Login Successful!"
+      );
+
+      // ==================================================
+      // ROLE-BASED REDIRECT
+      //
+      // Backend decides the user's role.
+      // ==================================================
+
+      if (userRole === "admin") {
+        navigate(
+          "/admin/dashboard",
+          {
+            replace: true,
+          }
+        );
+
         return;
       }
 
-      // Save Login
-      login(data.token, data.user);
+      if (userRole === "teacher") {
+        navigate(
+          "/teacher/dashboard",
+          {
+            replace: true,
+          }
+        );
 
-      toast.success("Login Successful!");
-
-      // Redirect
-      if (data.user.role === "admin") {
-        navigate("/admin/dashboard");
-      } else {
-        navigate("/teacher/dashboard");
+        return;
       }
+
+      // ==================================================
+      // UNKNOWN ROLE
+      // ==================================================
+
+      toast.error(
+        "Your account has an unsupported role."
+      );
+
     } catch (err) {
+      console.error(
+        "Login Error:",
+        err
+      );
+
       const message =
         err.response?.data?.message ||
         err.message ||
         "Unable to login. Please try again.";
 
       toast.error(message);
+
     } finally {
       setLoading(false);
     }
   };
 
+  // ======================================================
+  // UI
+  // ======================================================
+
   return (
     <div className="login-form-container">
+
+      {/* ==================================================
+          HEADER
+      ================================================== */}
+
       <div className="login-header">
+
         <span className="login-badge">
           <FaShieldAlt />
           Secure Login
         </span>
 
-        <h2>Welcome Back</h2>
+        <h2>
+          Welcome Back
+        </h2>
 
         <p className="login-subtitle">
-          Sign in to access your VivaPartner dashboard and
-          continue managing AI-powered viva examinations.
+          Sign in to access your
+          VivaPartner dashboard and
+          continue managing AI-powered
+          viva examinations.
         </p>
+
       </div>
+
+      {/* ==================================================
+          FORM
+      ================================================== */}
 
       <form
         className="login-form"
         onSubmit={handleSubmit}
       >
-        <RoleSelector
-          selectedRole={selectedRole}
-          setSelectedRole={setSelectedRole}
-        />
 
-        {/* Email */}
+        {/* ==================================================
+            EMAIL
+        ================================================== */}
 
         <div className="form-group">
+
           <label htmlFor="email">
             Email Address
           </label>
 
           <div
             className={`input-box ${
-              errors.email ? "error" : ""
+              errors.email
+                ? "error"
+                : ""
             }`}
           >
-            <FaEnvelope className="input-icon" />
+
+            <FaEnvelope
+              className="input-icon"
+              aria-hidden="true"
+            />
 
             <input
               type="email"
               id="email"
               name="email"
-              value={formData.email}
-              onChange={handleChange}
+
+              value={
+                formData.email
+              }
+
+              onChange={
+                handleChange
+              }
+
               autoComplete="email"
+
               placeholder="Enter your email"
+
               disabled={loading}
             />
+
           </div>
 
           {errors.email && (
@@ -175,21 +345,31 @@ const LoginForm = () => {
               {errors.email}
             </p>
           )}
+
         </div>
 
-        {/* Password */}
+        {/* ==================================================
+            PASSWORD
+        ================================================== */}
 
         <div className="form-group">
+
           <label htmlFor="password">
             Password
           </label>
 
           <div
             className={`input-box password-input ${
-              errors.password ? "error" : ""
+              errors.password
+                ? "error"
+                : ""
             }`}
           >
-            <FaLock className="input-icon" />
+
+            <FaLock
+              className="input-icon"
+              aria-hidden="true"
+            />
 
             <input
               type={
@@ -197,24 +377,44 @@ const LoginForm = () => {
                   ? "text"
                   : "password"
               }
+
               id="password"
+
               name="password"
-              value={formData.password}
-              onChange={handleChange}
+
+              value={
+                formData.password
+              }
+
+              onChange={
+                handleChange
+              }
+
               autoComplete="current-password"
+
               placeholder="Enter your password"
+
               disabled={loading}
             />
 
             <button
               type="button"
+
               className="password-toggle"
+
               onClick={() =>
                 setShowPassword(
-                  !showPassword
+                  (prev) => !prev
                 )
               }
+
               disabled={loading}
+
+              aria-label={
+                showPassword
+                  ? "Hide password"
+                  : "Show password"
+              }
             >
               {showPassword ? (
                 <FaEyeSlash />
@@ -222,6 +422,7 @@ const LoginForm = () => {
                 <FaEye />
               )}
             </button>
+
           </div>
 
           {errors.password && (
@@ -229,58 +430,92 @@ const LoginForm = () => {
               {errors.password}
             </p>
           )}
+
         </div>
 
-        {/* Options */}
+        {/* ==================================================
+            OPTIONS
+        ================================================== */}
 
         <div className="login-options">
+
           <label className="remember-me">
+
             <input
               type="checkbox"
+
               name="remember"
-              checked={formData.remember}
-              onChange={handleChange}
+
+              checked={
+                formData.remember
+              }
+
+              onChange={
+                handleChange
+              }
+
               disabled={loading}
             />
-            <span>Remember me</span>
+
+            <span>
+              Remember me
+            </span>
+
           </label>
 
           <Link
             to="/forgot-password"
             className="forgot-password"
-            onClick={(e) =>
-              loading &&
-              e.preventDefault()
-            }
+            onClick={(e) => {
+              if (loading) {
+                e.preventDefault();
+              }
+            }}
           >
             Forgot Password?
           </Link>
+
         </div>
 
-        {/* Login Button */}
+        {/* ==================================================
+            LOGIN BUTTON
+        ================================================== */}
 
         <button
           type="submit"
+
           className="login-btn"
+
           disabled={loading}
         >
+
           {loading ? (
             <>
               <span className="spinner"></span>
+
               Signing In...
             </>
           ) : (
             "Login to Dashboard"
           )}
+
         </button>
+
       </form>
 
+      {/* ==================================================
+          FOOTER
+      ================================================== */}
+
       <div className="login-footer">
+
         <p>
-          Protected by secure authentication and
-          encrypted communication.
+          Protected by secure authentication
+          and encrypted communication.
         </p>
+
       </div>
+
     </div>
   );
 };

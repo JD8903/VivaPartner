@@ -11,272 +11,272 @@
   align-items: center;
 
   background:
-    radial-gradient(circle at top left, rgba(37,99,235,.18), transparent 35%),
-    radial-gradient(circle at bottom right, rgba(59,130,246,.15), transparent 30%),
-    linear-gradient(135deg,#eff6ff,#dbeafe);
+    radial-gradient(
+      circle at top left,
+      rgba(37, 99, 235, 0.18),
+      transparent 35%
+    ),
+    radial-gradient(
+      circle at bottom right,
+      rgba(59, 130, 246, 0.15),
+      transparent 30%
+    ),
+    linear-gradient(
+      135deg,
+      #eff6ff,
+      #dbeafe
+    );
 }
 
+/* ======================================================
+   LOGIN WRAPPER
+====================================================== */
+
 .login-wrapper {
+  width: 100%;
+  max-width: 1320px;
+  min-height: 720px;
 
-  width:100%;
-  max-width:1320px;
+  display: grid;
+  grid-template-columns: 1fr 1fr;
 
-  min-height:720px;
+  overflow: hidden;
 
-  display:grid;
-  grid-template-columns:1fr 1fr;
+  border-radius: 28px;
 
-  overflow:hidden;
-
-  border-radius:28px;
-
-  background:#ffffff;
+  background: #ffffff;
 
   box-shadow:
-      0 25px 60px rgba(15,23,42,.12);
+    0 25px 60px rgba(15, 23, 42, 0.12);
 }
 
 /* ======================================================
    LEFT PANEL
 ====================================================== */
 
-.login-left{
+.login-left {
+  position: relative;
+  overflow: hidden;
 
-    position:relative;
-
-    overflow:hidden;
-
-    background:linear-gradient(
-        135deg,
-        #2563eb,
-        #1d4ed8,
-        #1e40af
+  background:
+    linear-gradient(
+      135deg,
+      #2563eb,
+      #1d4ed8,
+      #1e40af
     );
 
-    color:#fff;
+  color: #ffffff;
 
-    padding:70px;
+  padding: 70px;
 
-    display:flex;
-    align-items:center;
+  display: flex;
+  align-items: center;
 }
 
-.branding{
+.branding {
+  position: relative;
+  z-index: 2;
 
-    position:relative;
-    z-index:2;
-
-    max-width:480px;
+  max-width: 480px;
 }
 
-/* Logo */
+/* ======================================================
+   LOGO
+====================================================== */
 
-.logo-box{
+.logo-box {
+  width: 88px;
+  height: 88px;
 
-    width:88px;
-    height:88px;
+  display: flex;
+  justify-content: center;
+  align-items: center;
 
-    display:flex;
-    justify-content:center;
-    align-items:center;
+  border-radius: 24px;
 
-    border-radius:24px;
+  background: rgba(255, 255, 255, 0.18);
 
-    background:rgba(255,255,255,.18);
+  backdrop-filter: blur(12px);
 
-    backdrop-filter:blur(12px);
+  font-size: 34px;
+  font-weight: 700;
 
-    font-size:34px;
-    font-weight:700;
-
-    margin-bottom:24px;
+  margin-bottom: 24px;
 }
 
-/* Badge */
+/* ======================================================
+   BADGE
+====================================================== */
 
-.brand-badge{
+.brand-badge {
+  display: inline-flex;
 
-    display:inline-flex;
+  padding: 8px 16px;
 
-    padding:8px 16px;
+  border-radius: 999px;
 
-    border-radius:999px;
+  background: rgba(255, 255, 255, 0.15);
 
-    background:rgba(255,255,255,.15);
+  border: 1px solid rgba(255, 255, 255, 0.18);
 
-    border:1px solid rgba(255,255,255,.18);
+  font-size: 14px;
 
-    font-size:14px;
-
-    margin-bottom:22px;
+  margin-bottom: 22px;
 }
 
-.branding h1{
+/* ======================================================
+   BRAND TITLE
+====================================================== */
 
-    font-size:52px;
+.branding h1 {
+  font-size: 52px;
+  font-weight: 700;
 
-    font-weight:700;
-
-    margin-bottom:18px;
+  margin: 0 0 18px;
 }
 
-.tagline{
+/* ======================================================
+   TAGLINE
+====================================================== */
 
-    font-size:18px;
+.tagline {
+  font-size: 18px;
+  line-height: 1.8;
 
-    line-height:1.8;
+  opacity: 0.92;
 
-    opacity:.92;
-
-    margin-bottom:45px;
+  margin: 0 0 45px;
 }
 
 /* ======================================================
    FEATURES
 ====================================================== */
 
-.feature-list{
+.feature-list {
+  display: flex;
+  flex-direction: column;
 
-    display:flex;
-    flex-direction:column;
-
-    gap:20px;
+  gap: 20px;
 }
 
-.feature-item{
+.feature-item {
+  display: flex;
+  align-items: center;
 
-    display:flex;
-    align-items:center;
+  gap: 16px;
 
-    gap:16px;
+  font-size: 17px;
+  font-weight: 500;
 
-    font-size:17px;
-    font-weight:500;
-
-    opacity:.95;
+  opacity: 0.95;
 }
 
-.feature-item svg{
+.feature-item svg {
+  flex-shrink: 0;
 
-    width:48px;
-    height:48px;
+  width: 48px;
+  height: 48px;
 
-    padding:12px;
+  padding: 12px;
 
-    border-radius:14px;
+  border-radius: 14px;
 
-    background:rgba(255,255,255,.15);
+  background: rgba(255, 255, 255, 0.15);
 
-    backdrop-filter:blur(10px);
+  backdrop-filter: blur(10px);
 }
 
 /* ======================================================
    DECORATION
 ====================================================== */
 
-.bg-circle{
+.bg-circle {
+  position: absolute;
 
-    position:absolute;
+  border-radius: 50%;
 
-    border-radius:50%;
+  background: rgba(255, 255, 255, 0.08);
 
-    background:rgba(255,255,255,.08);
-
-    animation:float 8s ease-in-out infinite;
+  animation: float 8s ease-in-out infinite;
 }
 
-.circle1{
+.circle1 {
+  width: 300px;
+  height: 300px;
 
-    width:300px;
-    height:300px;
-
-    top:-120px;
-    left:-120px;
+  top: -120px;
+  left: -120px;
 }
 
-.circle2{
+.circle2 {
+  width: 220px;
+  height: 220px;
 
-    width:220px;
-    height:220px;
-
-    bottom:-80px;
-    right:-80px;
+  bottom: -80px;
+  right: -80px;
 }
 
-@keyframes float{
+@keyframes float {
+  0%,
+  100% {
+    transform: translateY(0);
+  }
 
-    0%,100%{
-        transform:translateY(0);
-    }
-
-    50%{
-        transform:translateY(-18px);
-    }
-
+  50% {
+    transform: translateY(-18px);
+  }
 }
 
 /* ======================================================
    RIGHT PANEL
 ====================================================== */
 
-.login-right{
+.login-right {
+  display: flex;
 
-    display:flex;
-    justify-content:center;
-    align-items:center;
+  justify-content: center;
+  align-items: center;
 
-    padding:60px;
+  padding: 60px;
 
-    background:#f8fbff;
+  background: #f8fbff;
 }
 
 /* ======================================================
    RESPONSIVE
 ====================================================== */
 
-@media(max-width:1100px){
+@media (max-width: 1100px) {
+  .login-wrapper {
+    grid-template-columns: 1fr;
+  }
 
-    .login-wrapper{
-
-        grid-template-columns:1fr;
-    }
-
-    .login-left{
-
-        padding:55px;
-    }
-
+  .login-left {
+    padding: 55px;
+  }
 }
 
-@media(max-width:768px){
+@media (max-width: 768px) {
+  .login-left {
+    display: none;
+  }
 
-    .login-left{
+  .login-wrapper {
+    min-height: auto;
+  }
 
-        display:none;
-    }
-
-    .login-wrapper{
-
-        min-height:auto;
-    }
-
-    .login-right{
-
-        padding:30px 22px;
-    }
-
+  .login-right {
+    padding: 30px 22px;
+  }
 }
 
-@media(max-width:480px){
+@media (max-width: 480px) {
+  .login-page {
+    padding: 15px;
+  }
 
-    .login-page{
-
-        padding:15px;
-    }
-
-    .login-right{
-
-        padding:20px;
-    }
-
+  .login-right {
+    padding: 20px;
+  }
 }
