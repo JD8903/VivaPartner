@@ -5,351 +5,727 @@ import "./VivaSetup.css";
 const VivaSetup = () => {
   const navigate = useNavigate();
 
-  const [selectedClass, setSelectedClass] = useState(null);
+  // =====================================================
+  // STATE
+  // =====================================================
 
-  const [vivaConfig, setVivaConfig] = useState({
-    studentsPerViva: 2,
-    numberOfQuestions: 5,
-    difficulty: "Medium",
-    timePerQuestion: 60,
-    language: "English",
-    negativeMarking: false,
-  });
+  const [selectedClass, setSelectedClass] = useState(null);
+  const [selectedStudents, setSelectedStudents] = useState([]);
+
+  const [studentsPerViva, setStudentsPerViva] = useState(2);
 
   const [error, setError] = useState("");
+  const [saved, setSaved] = useState(false);
 
-  // Load selected class
+  // =====================================================
+  // LOAD EXISTING DATA
+  // =====================================================
+
   useEffect(() => {
-    const storedClass = localStorage.getItem("selectedClass");
-
-    if (!storedClass) {
-      navigate("/teacher/assigned-classes");
-      return;
-    }
-
     try {
-      setSelectedClass(JSON.parse(storedClass));
-    } catch (err) {
-      console.error(err);
-      localStorage.removeItem("selectedClass");
-      navigate("/teacher/assigned-classes");
+      const storedClass = localStorage.getItem("selectedClass");
+
+      const storedStudents =
+        localStorage.getItem("selectedStudents");
+
+      const storedConfig =
+        localStorage.getItem("vivaConfig");
+
+      // -----------------------------------------------
+      // Class is required
+      // -----------------------------------------------
+
+      if (!storedClass) {
+        navigate("/teacher/assigned-classes");
+        return;
+      }
+
+      const parsedClass = JSON.parse(storedClass);
+
+      setSelectedClass(parsedClass);
+
+      // -----------------------------------------------
+      // Load selected students
+      // -----------------------------------------------
+
+      if (storedStudents) {
+        const parsedStudents =
+          JSON.parse(storedStudents);
+
+        if (Array.isArray(parsedStudents)) {
+          setSelectedStudents(parsedStudents);
+        }
+      }
+
+      // -----------------------------------------------
+      // Load existing Viva Configuration
+      // -----------------------------------------------
+
+      if (storedConfig) {
+        const config = JSON.parse(storedConfig);
+
+        if (config.studentsPerViva) {
+          setStudentsPerViva(
+            Number(config.studentsPerViva)
+          );
+        }
+      }
+    } catch (error) {
+      console.error(
+        "Failed to load Viva configuration:",
+        error
+      );
+
+      setError(
+        "Unable to load Viva configuration."
+      );
     }
   }, [navigate]);
 
-  // Load previous configuration
-  useEffect(() => {
-    const savedConfig = localStorage.getItem("vivaConfig");
+  // =====================================================
+  // SELECT STUDENTS PER VIVA
+  // =====================================================
 
-    if (savedConfig) {
-      try {
-        setVivaConfig(JSON.parse(savedConfig));
-      } catch (err) {
-        console.error("Invalid viva config:", err);
+  const handleStudentsPerViva = (value) => {
+    setStudentsPerViva(value);
+
+    setSaved(false);
+    setError("");
+  };
+
+  // =====================================================
+  // SAVE CONFIGURATION
+  // =====================================================
+
+  const saveConfigurationToLocalStorage = () => {
+    try {
+      setError("");
+
+      // -----------------------------------------------
+      // Validate class
+      // -----------------------------------------------
+
+      if (!selectedClass) {
+        setError("Please select a class first.");
+        return false;
       }
-    }
-  }, []);
 
-  // Auto Save
-  useEffect(() => {
-    localStorage.setItem(
-      "vivaConfig",
-      JSON.stringify(vivaConfig)
-    );
-  }, [vivaConfig]);
+      // -----------------------------------------------
+      // Validate students per Viva
+      // -----------------------------------------------
+
+      if (![1, 2, 3, 4].includes(studentsPerViva)) {
+        setError(
+          "Students per Viva must be between 1 and 4."
+        );
+
+        return false;
+      }
+
+      // -----------------------------------------------
+      // Validate selected students
+      // -----------------------------------------------
+
+      if (
+        selectedStudents.length > 0 &&
+        studentsPerViva > selectedStudents.length
+      ) {
+        setError(
+          `You have selected only ${selectedStudents.length} students. Students per Viva cannot be greater than the selected students.`
+        );
+
+        return false;
+      }
+
+      // -----------------------------------------------
+      // Get existing configuration
+      // -----------------------------------------------
+
+      let existingConfig = {};
+
+      const storedConfig =
+        localStorage.getItem("vivaConfig");
+
+      if (storedConfig) {
+        try {
+          existingConfig = JSON.parse(storedConfig);
+        } catch (error) {
+          console.warn(
+            "Invalid stored Viva configuration. Creating a new one."
+          );
+
+          existingConfig = {};
+        }
+      }
+
+      // -----------------------------------------------
+      // Get Class ID
+      // -----------------------------------------------
+
+      const classId =
+        selectedClass?.class?._id ||
+        selectedClass?.classId ||
+        selectedClass?._id ||
+        "";
+
+      // -----------------------------------------------
+      // Updated configuration
+      // -----------------------------------------------
+
+      const updatedConfig = {
+        ...existingConfig,
+
+        classId,
+
+        studentsPerViva,
+
+        selectedStudents,
+
+        studentSelectionMode:
+          selectedStudents.length > 0
+            ? "selected"
+            : "all",
+
+        // Keep configuration status
+        configurationStep: "8.3",
+
+        configurationCompleted: true,
+      };
+
+      // -----------------------------------------------
+      // Save
+      // -----------------------------------------------
+
+      localStorage.setItem(
+        "vivaConfig",
+        JSON.stringify(updatedConfig)
+      );
+
+      return true;
+    } catch (error) {
+      console.error(
+        "Save Viva Configuration Error:",
+        error
+      );
+
+      setError(
+        "Failed to save Viva configuration."
+      );
+
+      return false;
+    }
+  };
+
+  // =====================================================
+  // SAVE BUTTON
+  // =====================================================
+
+  const handleSaveConfiguration = () => {
+    const success =
+      saveConfigurationToLocalStorage();
+
+    if (!success) {
+      return;
+    }
+
+    setSaved(true);
+
+    // Hide success message after 3 seconds
+    setTimeout(() => {
+      setSaved(false);
+    }, 3000);
+  };
+
+  // =====================================================
+  // CONTINUE TO STUDY MATERIAL
+  // =====================================================
 
   const handleContinue = () => {
-    if (
-      vivaConfig.studentsPerViva < 1 ||
-      vivaConfig.studentsPerViva > 4
-    ) {
-      setError("Students per viva must be between 1 and 4.");
-      return;
-    }
-
-    if (
-      vivaConfig.numberOfQuestions < 1 ||
-      vivaConfig.numberOfQuestions > 20
-    ) {
-      setError("Number of questions must be between 1 and 20.");
-      return;
-    }
-
-    if (
-      !["Easy", "Medium", "Hard"].includes(
-        vivaConfig.difficulty
-      )
-    ) {
-      setError("Invalid difficulty selected.");
-      return;
-    }
-
     setError("");
+
+    // -----------------------------------------------
+    // Save configuration before moving forward
+    // -----------------------------------------------
+
+    const success =
+      saveConfigurationToLocalStorage();
+
+    if (!success) {
+      return;
+    }
+
+    // -----------------------------------------------
+    // Mark configuration as completed
+    // -----------------------------------------------
+
+    const storedConfig =
+      localStorage.getItem("vivaConfig");
+
+    let config = {};
+
+    try {
+      config = storedConfig
+        ? JSON.parse(storedConfig)
+        : {};
+    } catch (error) {
+      config = {};
+    }
+
+    const updatedConfig = {
+      ...config,
+
+      configurationStep: "8.3",
+
+      configurationCompleted: true,
+
+      studyMaterialRequired: true,
+    };
 
     localStorage.setItem(
       "vivaConfig",
-      JSON.stringify(vivaConfig)
+      JSON.stringify(updatedConfig)
     );
 
-    navigate("/teacher/upload-students");
+    // -----------------------------------------------
+    // GO TO PHASE 9
+    // -----------------------------------------------
+
+    navigate("/teacher/study-material");
   };
+
+  // =====================================================
+  // CLASS INFORMATION
+  // =====================================================
+
+  const className =
+    selectedClass?.class?.name ||
+    selectedClass?.className ||
+    selectedClass?.name ||
+    "Selected Class";
+
+  const subjectName =
+    selectedClass?.subject?.name ||
+    selectedClass?.subjectName ||
+    "N/A";
+
+  const departmentName =
+    selectedClass?.department?.name ||
+    selectedClass?.departmentName ||
+    "N/A";
+
+  // =====================================================
+  // LOADING
+  // =====================================================
 
   if (!selectedClass) {
     return (
-      <div className="viva-loading">
-        <h2>Loading Viva Setup...</h2>
+      <div className="viva-setup-loading">
+        Loading Viva Configuration...
       </div>
     );
   }
 
+  // =====================================================
+  // UI
+  // =====================================================
+
   return (
     <div className="viva-setup-page">
-      {/* Header */}
 
-      <div className="viva-header">
+      {/* =================================================
+          HEADER
+      ================================================= */}
+
+      <div className="viva-setup-header">
         <div>
-          <h1>Viva Setup</h1>
+          <h1>Viva Configuration</h1>
 
           <p>
-            Configure your viva session before uploading
-            students.
+            Configure the settings for your AI Viva
+            examination.
           </p>
         </div>
       </div>
 
-      {/* Class Information */}
+      {/* =================================================
+          CLASS INFORMATION
+      ================================================= */}
 
-      <div className="class-info-card">
-        <div className="class-info-header">
-          <div>
-            <h2>{selectedClass.class?.name}</h2>
+      <div className="viva-class-card">
 
-            <span className="department-chip">
-              {selectedClass.department?.name}
-            </span>
-          </div>
-
-          <span className="semester-chip">
-            Semester {selectedClass.class?.semester}
-          </span>
+        <div className="class-info">
+          <span>Selected Class</span>
+          <h2>{className}</h2>
         </div>
 
-        <div className="class-info-grid">
-          <div className="info-box">
-            <label>Subject</label>
-
-            <h4>{selectedClass.subject?.name}</h4>
-          </div>
-
-          <div className="info-box">
-            <label>Academic Year</label>
-
-            <h4>
-              {selectedClass.class?.academicYear}
-            </h4>
-          </div>
-
-          <div className="info-box">
-            <label>Capacity</label>
-
-            <h4>
-              {selectedClass.class?.capacity} Students
-            </h4>
-          </div>
-
-          <div className="info-box">
-            <label>Status</label>
-
-            <span className="status-badge">
-              {selectedClass.status}
-            </span>
-          </div>
+        <div className="class-info">
+          <span>Department</span>
+          <h3>{departmentName}</h3>
         </div>
+
+        <div className="class-info">
+          <span>Subject</span>
+          <h3>{subjectName}</h3>
+        </div>
+
+        <div className="class-info">
+          <span>Selected Students</span>
+
+          <h3>
+            {selectedStudents.length || "All"}
+          </h3>
+        </div>
+
       </div>
 
-      {/* Configuration */}
+      {/* =================================================
+          ERROR
+      ================================================= */}
 
-      <div className="config-card">
-        <h2>Viva Configuration</h2>
+      {error && (
+        <div className="viva-error">
+          ⚠ {error}
+        </div>
+      )}
 
-        <div className="config-grid">
-          {/* Students */}
+      {/* =================================================
+          SUCCESS
+      ================================================= */}
 
-          <div className="form-group">
-            <label>Students Per Viva</label>
+      {saved && (
+        <div className="viva-success">
+          ✓ Students per Viva configuration saved
+          successfully.
+        </div>
+      )}
 
-            <select
-              value={vivaConfig.studentsPerViva}
-              onChange={(e) =>
-                setVivaConfig({
-                  ...vivaConfig,
-                  studentsPerViva: Number(
-                    e.target.value
-                  ),
-                })
-              }
-            >
-              <option value={1}>1 Student</option>
-              <option value={2}>2 Students</option>
-              <option value={3}>3 Students</option>
-              <option value={4}>4 Students</option>
-            </select>
-          </div>
+      {/* =================================================
+          STUDENTS PER VIVA
+      ================================================= */}
 
-          {/* Questions */}
+      <div className="configuration-card">
 
-          <div className="form-group">
-            <label>Number of Questions</label>
+        <div className="configuration-heading">
 
-            <input
-              type="number"
-              min="1"
-              max="20"
-              value={vivaConfig.numberOfQuestions}
-              onChange={(e) =>
-                setVivaConfig({
-                  ...vivaConfig,
-                  numberOfQuestions: Number(
-                    e.target.value
-                  ),
-                })
-              }
-            />
-          </div>
+          <div>
 
-          {/* Difficulty */}
+            <span className="step-number">
+              8.3
+            </span>
 
-          <div className="form-group">
-            <label>Difficulty</label>
+            <div>
+              <h2>Students Per Viva</h2>
 
-            <select
-              value={vivaConfig.difficulty}
-              onChange={(e) =>
-                setVivaConfig({
-                  ...vivaConfig,
-                  difficulty: e.target.value,
-                })
-              }
-            >
-              <option value="Easy">Easy</option>
-              <option value="Medium">Medium</option>
-              <option value="Hard">Hard</option>
-            </select>
-          </div>
-
-          {/* Time */}
-
-          <div className="form-group">
-            <label>Time Per Question</label>
-
-            <select
-              value={vivaConfig.timePerQuestion}
-              onChange={(e) =>
-                setVivaConfig({
-                  ...vivaConfig,
-                  timePerQuestion: Number(
-                    e.target.value
-                  ),
-                })
-              }
-            >
-              <option value={30}>
-                30 Seconds
-              </option>
-
-              <option value={45}>
-                45 Seconds
-              </option>
-
-              <option value={60}>
-                60 Seconds
-              </option>
-
-              <option value={90}>
-                90 Seconds
-              </option>
-
-              <option value={120}>
-                120 Seconds
-              </option>
-            </select>
-          </div>
-
-          {/* Language */}
-
-          <div className="form-group">
-            <label>Language</label>
-
-            <select
-              value={vivaConfig.language}
-              onChange={(e) =>
-                setVivaConfig({
-                  ...vivaConfig,
-                  language: e.target.value,
-                })
-              }
-            >
-              <option value="English">
-                English
-              </option>
-
-              <option value="Gujarati">
-                Gujarati
-              </option>
-
-              <option value="Hindi">
-                Hindi
-              </option>
-            </select>
-          </div>
-
-          {/* Negative Marking */}
-
-          <div className="form-group">
-            <label>Negative Marking</label>
-
-            <div className="toggle-container">
-              <label className="switch">
-                <input
-                  type="checkbox"
-                  checked={
-                    vivaConfig.negativeMarking
-                  }
-                  onChange={(e) =>
-                    setVivaConfig({
-                      ...vivaConfig,
-                      negativeMarking:
-                        e.target.checked,
-                    })
-                  }
-                />
-
-                <span className="slider"></span>
-              </label>
-
-              <span className="toggle-text">
-                {vivaConfig.negativeMarking
-                  ? "Enabled"
-                  : "Disabled"}
-              </span>
+              <p>
+                Choose how many students should
+                participate in one Viva session.
+              </p>
             </div>
+
           </div>
+
         </div>
 
-        {error && (
-          <div className="config-error">
-            {error}
+        {/* =================================================
+            OPTIONS
+        ================================================= */}
+
+        <div className="students-per-viva-options">
+
+          {/* -----------------------------------------------
+              INDIVIDUAL
+          ----------------------------------------------- */}
+
+          <button
+            type="button"
+            className={`viva-option ${
+              studentsPerViva === 1
+                ? "active"
+                : ""
+            }`}
+            onClick={() =>
+              handleStudentsPerViva(1)
+            }
+          >
+            <div className="option-icon">
+              1
+            </div>
+
+            <div className="option-content">
+              <h3>Individual</h3>
+
+              <p>
+                One student per Viva
+              </p>
+            </div>
+
+            <div className="radio-indicator">
+              {studentsPerViva === 1
+                ? "✓"
+                : ""}
+            </div>
+          </button>
+
+          {/* -----------------------------------------------
+              PAIR
+          ----------------------------------------------- */}
+
+          <button
+            type="button"
+            className={`viva-option ${
+              studentsPerViva === 2
+                ? "active"
+                : ""
+            }`}
+            onClick={() =>
+              handleStudentsPerViva(2)
+            }
+          >
+            <div className="option-icon">
+              2
+            </div>
+
+            <div className="option-content">
+              <h3>Pair</h3>
+
+              <p>
+                Two students per Viva
+              </p>
+            </div>
+
+            <div className="radio-indicator">
+              {studentsPerViva === 2
+                ? "✓"
+                : ""}
+            </div>
+          </button>
+
+          {/* -----------------------------------------------
+              GROUP OF 3
+          ----------------------------------------------- */}
+
+          <button
+            type="button"
+            className={`viva-option ${
+              studentsPerViva === 3
+                ? "active"
+                : ""
+            }`}
+            onClick={() =>
+              handleStudentsPerViva(3)
+            }
+          >
+            <div className="option-icon">
+              3
+            </div>
+
+            <div className="option-content">
+              <h3>Group of 3</h3>
+
+              <p>
+                Three students per Viva
+              </p>
+            </div>
+
+            <div className="radio-indicator">
+              {studentsPerViva === 3
+                ? "✓"
+                : ""}
+            </div>
+          </button>
+
+          {/* -----------------------------------------------
+              GROUP OF 4
+          ----------------------------------------------- */}
+
+          <button
+            type="button"
+            className={`viva-option ${
+              studentsPerViva === 4
+                ? "active"
+                : ""
+            }`}
+            onClick={() =>
+              handleStudentsPerViva(4)
+            }
+          >
+            <div className="option-icon">
+              4
+            </div>
+
+            <div className="option-content">
+              <h3>Group of 4</h3>
+
+              <p>
+                Four students per Viva
+              </p>
+            </div>
+
+            <div className="radio-indicator">
+              {studentsPerViva === 4
+                ? "✓"
+                : ""}
+            </div>
+          </button>
+
+        </div>
+
+        {/* =================================================
+            CURRENT SELECTION
+        ================================================= */}
+
+        <div className="selection-summary">
+
+          <div>
+            <span>
+              Current Selection
+            </span>
+
+            <strong>
+              {studentsPerViva === 1 &&
+                "Individual"}
+
+              {studentsPerViva === 2 &&
+                "Pair (2 Students)"}
+
+              {studentsPerViva === 3 &&
+                "Group of 3"}
+
+              {studentsPerViva === 4 &&
+                "Group of 4"}
+            </strong>
+          </div>
+
+          <div>
+            <span>
+              Students Per Viva
+            </span>
+
+            <strong>
+              {studentsPerViva}
+            </strong>
+          </div>
+
+        </div>
+
+      </div>
+
+      {/* =================================================
+          EXAMPLE
+      ================================================= */}
+
+      <div className="example-card">
+
+        <h3>
+          Example
+        </h3>
+
+        {studentsPerViva === 1 && (
+          <div className="example-groups">
+            <div>
+              Group 1 → Rahul
+            </div>
+
+            <div>
+              Group 2 → Priya
+            </div>
+
+            <div>
+              Group 3 → Jay
+            </div>
           </div>
         )}
 
-        <div className="config-actions">
-          <button
-            className="continue-btn"
-            onClick={handleContinue}
-          >
-            Continue to Student Upload →
-          </button>
-        </div>
+        {studentsPerViva === 2 && (
+          <div className="example-groups">
+
+            <div>
+              Group 1 → Rahul + Priya
+            </div>
+
+            <div>
+              Group 2 → Jay + Meet
+            </div>
+
+            <div>
+              Group 3 → Riya + Dev
+            </div>
+
+          </div>
+        )}
+
+        {studentsPerViva === 3 && (
+          <div className="example-groups">
+
+            <div>
+              Group 1 → Rahul + Priya + Jay
+            </div>
+
+            <div>
+              Group 2 → Meet + Riya + Dev
+            </div>
+
+          </div>
+        )}
+
+        {studentsPerViva === 4 && (
+          <div className="example-groups">
+
+            <div>
+              Group 1 → Rahul + Priya + Jay + Meet
+            </div>
+
+            <div>
+              Group 2 → Riya + Dev + Yash + Krish
+            </div>
+
+          </div>
+        )}
+
       </div>
+
+      {/* =================================================
+          ACTIONS
+      ================================================= */}
+
+      <div className="viva-setup-actions">
+
+        {/* BACK */}
+
+        <button
+          type="button"
+          className="back-button"
+          onClick={() =>
+            navigate(
+              "/teacher/student-pairing"
+            )
+          }
+        >
+          ← Back
+        </button>
+
+        {/* SAVE */}
+
+        <button
+          type="button"
+          className="save-button"
+          onClick={handleSaveConfiguration}
+        >
+          ✓ Save Configuration
+        </button>
+
+        {/* CONTINUE */}
+
+        <button
+          type="button"
+          className="continue-button"
+          onClick={handleContinue}
+        >
+          Continue →
+        </button>
+
+      </div>
+
     </div>
   );
 };

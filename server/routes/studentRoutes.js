@@ -1,5 +1,6 @@
 const express = require("express");
 const upload = require("../middleware/excelUpload");
+const { protect } = require("../middleware/authMiddleware");
 
 const {
   uploadStudents,
@@ -12,17 +13,18 @@ const router = express.Router();
 // Upload Students from Excel
 router.post(
   "/upload",
+  protect,
   upload.single("excel"),
   uploadStudents
 );
 
 // Get All Students (Search + Filter + Pagination)
-router.get("/", getStudents);
+router.get("/", protect, getStudents);
 
 // Update Student
-router.put("/:id", updateStudent);
+router.put("/:id", protect, updateStudent);
 
 // Delete Student
-router.delete("/:id", deleteStudent);
+router.delete("/:id", protect, deleteStudent);
 
 module.exports = router;

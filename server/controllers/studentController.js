@@ -1,4 +1,5 @@
 const Student = require("../models/Student");
+const Class = require("../models/Class");
 const { parseExcel } = require("../services/excelService");
 
 const uploadStudents = async (req, res) => {
@@ -14,8 +15,7 @@ const uploadStudents = async (req, res) => {
 
     let students = parseExcel(req.file.buffer);
 
-    console.log("Students:", students);
-    console.log("First Row:", students[0]);
+    console.log("Students raw count:", students.length);
 
     if (!students || students.length === 0) {
       return res.status(400).json({
@@ -24,8 +24,6 @@ const uploadStudents = async (req, res) => {
       });
     }
 
-    console.log("Keys:", Object.keys(students[0]));
-
     // Remove empty rows
     students = students.filter((row) =>
       Object.values(row).some(
@@ -33,23 +31,38 @@ const uploadStudents = async (req, res) => {
       )
     );
 
-    const requiredColumns = [
-      "Enrollment No",
-      "Student Name",
-      "Department",
-      "Semester",
-      "Class",
-    ];
+    if (students.length === 0) {
+      return res.status(400).json({
+        success: false,
+        message: "Excel file contains no non-empty rows.",
+      });
+    }
+
+    // Helper to find a key matching some names
+    const getRowValue = (row, names) => {
+      const keys = Object.keys(row);
+      for (const name of names) {
+        const key = keys.find(k => k.toLowerCase().replace(/[^a-z0-9]/g, "").includes(name.toLowerCase().replace(/[^a-z0-9]/g, "")));
+        if (key) return row[key];
+      }
+      return null;
+    };
+
+    // If Class information is missing in Excel, we look up from the class database
+    let defaultClassDoc = null;
+    if (classId) {
+      defaultClassDoc = await Class.findById(classId).populate("department");
+    }
 
     const firstRow = students[0];
+    const enrollmentKeyUsed = Object.keys(firstRow).find(k => k.toLowerCase().includes("enrollment") || k.toLowerCase() === "roll no" || k.toLowerCase() === "rollnumber");
+    const nameKeyUsed = Object.keys(firstRow).find(k => k.toLowerCase().includes("name"));
 
-    for (const column of requiredColumns) {
-      if (!(column in firstRow)) {
-        return res.status(400).json({
-          success: false,
-          message: `Missing column: ${column}`,
-        });
-      }
+    if (!enrollmentKeyUsed || !nameKeyUsed) {
+      return res.status(400).json({
+        success: false,
+        message: "Missing essential columns. Excel must contain 'Enrollment No' and 'Student Name' columns.",
+      });
     }
 
     // Duplicate check inside Excel
@@ -57,7 +70,9 @@ const uploadStudents = async (req, res) => {
     const duplicateInExcel = [];
 
     students.forEach((row) => {
-      const enrollment = String(row["Enrollment No"]).trim();
+      const val = row[enrollmentKeyUsed];
+      const enrollment = val ? String(val).trim() : "";
+      if (!enrollment) return;
 
       if (seen.has(enrollment)) {
         duplicateInExcel.push(enrollment);
@@ -70,33 +85,50 @@ const uploadStudents = async (req, res) => {
     const skippedStudents = [];
 
     for (const row of students) {
-      const enrollment = String(row["Enrollment No"]).trim();
+      const val = row[enrollmentKeyUsed];
+      const enrollment = val ? String(val).trim() : "";
+      if (!enrollment) continue;
 
       // Skip duplicate rows inside Excel
       if (duplicateInExcel.includes(enrollment)) {
         if (skippedStudents.includes(enrollment)) {
           continue;
         }
-
         skippedStudents.push(enrollment);
         continue;
       }
 
-      const exists = await Student.findOne({
-        enrollment,
-      });
+      const exists = await Student.findOne({ enrollment });
 
       if (exists) {
         skippedStudents.push(enrollment);
         continue;
       }
 
+      // Extract details
+      const studentName = String(row[nameKeyUsed] || "").trim();
+      
+      // Determine department, semester, class values
+      let deptVal = getRowValue(row, ["department", "dept"]);
+      let semVal = getRowValue(row, ["semester", "sem"]);
+      let classVal = getRowValue(row, ["class", "classid"]);
+
+      if (!deptVal && defaultClassDoc) {
+        deptVal = defaultClassDoc.department ? defaultClassDoc.department.name : "";
+      }
+      if (!semVal && defaultClassDoc) {
+        semVal = defaultClassDoc.semester;
+      }
+      if (!classVal && defaultClassDoc) {
+        classVal = defaultClassDoc.name;
+      }
+
       const studentData = {
         enrollment,
-        name: String(row["Student Name"]).trim(),
-        department: String(row["Department"]).trim(),
-        semester: Number(row["Semester"]),
-        classId: classId || String(row["Class"]).trim(),
+        name: studentName,
+        department: String(deptVal || "General").trim(),
+        semester: Number(semVal || 1),
+        classId: classId || String(classVal || "").trim(),
         vivaStatus: "Pending",
         marks: 0,
       };
@@ -107,28 +139,24 @@ const uploadStudents = async (req, res) => {
       }
 
       const student = await Student.create(studentData);
-
       importedStudents.push(student);
     }
 
     return res.status(201).json({
       success: true,
       message: "Students imported successfully.",
-
       summary: {
         totalRows: students.length,
         imported: importedStudents.length,
         skipped: skippedStudents.length,
         duplicateInExcel: duplicateInExcel.length,
       },
-
       duplicateInExcel,
       skippedEnrollments: skippedStudents,
       students: importedStudents,
     });
   } catch (error) {
     console.error("Student Import Error:", error);
-
     return res.status(500).json({
       success: false,
       message: "Failed to import students.",

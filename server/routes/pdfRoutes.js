@@ -1,15 +1,20 @@
 const express = require("express");
+
 const router = express.Router();
 
-const upload = require("../middleware/uploadMiddleware");
+const { extractPDF } = require("../controllers/pdfController");
 
 const {
-  extractPDF,
-} = require("../controllers/pdfController");
+  uploadSingleFile,
+} = require("../middleware/uploadMiddleware");
+
+// =====================================================
+// POST /api/pdf/extract
+// =====================================================
 
 router.post(
   "/extract",
-  upload.single("pdf"),
+  uploadSingleFile,
   extractPDF
 );
 

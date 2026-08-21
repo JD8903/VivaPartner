@@ -1,9 +1,14 @@
-import axios from "axios";
-
-const API = "http://localhost:5000/api/questions";
+import api from "./api";
 
 export const saveQuestionsToDB = async (data) => {
-  const response = await axios.post(`${API}/save`, data);
+  if (!data) {
+    throw new Error("Question data is required.");
+  }
+
+  const response = await api.post(
+    "/questions/save",
+    data
+  );
 
   return response.data;
 };

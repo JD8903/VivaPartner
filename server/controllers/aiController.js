@@ -1,153 +1,602 @@
 const axios = require("axios");
 
-const generateQuestions = async (req, res) => {
-  try {
-    const { studyContent, difficulty, questionCount } = req.body;
+// ======================================================
+// Ollama Configuration
+// ======================================================
 
-    if (!studyContent || studyContent.trim() === "") {
-      return res.status(400).json({
-        success: false,
-        message: "Study content is required.",
-      });
-    }
+const OLLAMA_URL =
+  process.env.OLLAMA_URL || "http://localhost:11434";
 
-    const prompt = `
-You are an expert university viva examiner.
+const OLLAMA_MODEL =
+  process.env.OLLAMA_MODEL || "llama3.1:8b";
 
-Study Material:
-${studyContent}
+// Maximum content sent to the model.
+// Keeps very large documents from breaking the request.
+const MAX_CONTENT_LENGTH = 60000;
 
-Generate exactly ${questionCount} viva questions.
+// ======================================================
+// Helper: Clean AI JSON
+// ======================================================
 
-Selected Difficulty: ${difficulty}
-
-Difficulty Guidelines:
-
-Easy:
-- Ask basic definition questions.
-- Focus on simple concepts.
-- Short and direct questions.
-
-Medium:
-- Ask conceptual questions.
-- Include explanation and application.
-- Moderate difficulty.
-
-Hard:
-- Ask analytical, comparison-based, scenario-based and advanced conceptual questions.
-- Require deep understanding.
-
-Rules:
-1. Generate exactly ${questionCount} questions.
-2. Questions must ONLY come from the study material.
-3. Do NOT repeat questions.
-4. Every question must have the selected difficulty.
-5. Return ONLY a valid JSON array.
-6. Do NOT include markdown, explanation or extra text.
-
-Return this exact format:
-
-[
-  {
-    "question": "What is Cloud Computing?",
-    "difficulty": "${difficulty}"
-  },
-  {
-    "question": "Explain Virtualization.",
-    "difficulty": "${difficulty}"
+const cleanAIResponse = (content) => {
+  if (!content || typeof content !== "string") {
+    throw new Error("AI returned an empty response.");
   }
-]
-`;
 
-    const response = await axios.post(
-      "http://localhost:11434/api/chat",
-      {
-        model: "llama3.1:8b",
-        stream: false,
-        messages: [
-          {
-            role: "user",
-            content: prompt,
-          },
-        ],
-      }
+  let cleaned = content.trim();
+
+  // Remove markdown code fences.
+  cleaned = cleaned
+    .replace(/^```json\s*/i, "")
+    .replace(/^```\s*/i, "")
+    .replace(/\s*```$/i, "")
+    .trim();
+
+  // Try to locate JSON object.
+  const objectStart = cleaned.indexOf("{");
+  const objectEnd = cleaned.lastIndexOf("}");
+
+  if (objectStart !== -1 && objectEnd !== -1) {
+    const objectText = cleaned.substring(
+      objectStart,
+      objectEnd + 1
     );
 
-    let content = response.data.message.content;
+    try {
+      return JSON.parse(objectText);
+    } catch (error) {
+      // Continue to array parsing.
+    }
+  }
 
-    console.log("\n========== OLLAMA RESPONSE ==========\n");
-    console.log(content);
-    console.log("\n=====================================\n");
+  // Try to locate JSON array.
+  const arrayStart = cleaned.indexOf("[");
+  const arrayEnd = cleaned.lastIndexOf("]");
 
-    // Remove markdown
-    content = content
-      .replace(/```json/g, "")
-      .replace(/```/g, "")
+  if (arrayStart !== -1 && arrayEnd !== -1) {
+    const arrayText = cleaned.substring(
+      arrayStart,
+      arrayEnd + 1
+    );
+
+    try {
+      return {
+        questions: JSON.parse(arrayText),
+      };
+    } catch (error) {
+      throw new Error(
+        "AI returned invalid JSON."
+      );
+    }
+  }
+
+  throw new Error(
+    "AI did not return a valid JSON response."
+  );
+};
+
+// ======================================================
+// Helper: Normalize Questions
+// ======================================================
+
+const normalizeQuestions = (
+  rawQuestions,
+  difficulty,
+  questionCount
+) => {
+  if (!Array.isArray(rawQuestions)) {
+    return [];
+  }
+
+  const normalized = rawQuestions
+    .map((item) => {
+      if (typeof item === "string") {
+        return {
+          question: item.trim(),
+          difficulty,
+        };
+      }
+
+      return {
+        question:
+          typeof item?.question === "string"
+            ? item.question.trim()
+            : "",
+
+        difficulty:
+          typeof item?.difficulty === "string"
+            ? item.difficulty
+            : difficulty,
+      };
+    })
+    .filter(
+      (item) =>
+        item.question &&
+        item.question.length >= 5
+    );
+
+  // Remove duplicate questions.
+  const uniqueQuestions = [];
+
+  const seen = new Set();
+
+  for (const item of normalized) {
+    const key = item.question
+      .toLowerCase()
+      .replace(/\s+/g, " ")
       .trim();
 
-    // Extract JSON array
-    const start = content.indexOf("[");
-    const end = content.lastIndexOf("]");
+    if (!seen.has(key)) {
+      seen.add(key);
+      uniqueQuestions.push(item);
+    }
+  }
 
-    if (start === -1 || end === -1) {
-      return res.status(500).json({
+  // Limit to requested number.
+  return uniqueQuestions
+    .slice(0, questionCount)
+    .map((item, index) => ({
+      id: index + 1,
+      question: item.question,
+      difficulty,
+    }));
+};
+
+// ======================================================
+// POST /api/ai/generate-questions
+// ======================================================
+
+const generateQuestions = async (req, res) => {
+  try {
+    const {
+      studyContent,
+      difficulty = "Medium",
+      questionCount = 10,
+      topic = "",
+      materialType = "",
+      fileName = "",
+    } = req.body;
+
+    // ==================================================
+    // Validate Request
+    // ==================================================
+
+    if (
+      !studyContent ||
+      typeof studyContent !== "string" ||
+      !studyContent.trim()
+    ) {
+      return res.status(400).json({
         success: false,
-        message: "AI did not return a valid JSON array.",
-        raw: content,
+        message:
+          "Current study material content is required.",
       });
     }
 
-    const jsonString = content.substring(start, end + 1);
+    const allowedDifficulties = [
+      "Easy",
+      "Medium",
+      "Hard",
+      "Mixed",
+    ];
 
-    let questions = JSON.parse(jsonString);
+    const selectedDifficulty =
+      allowedDifficulties.includes(difficulty)
+        ? difficulty
+        : "Medium";
 
-    // Validate & normalize
-    questions = questions.map((item) => ({
-      question: item.question || "",
-      difficulty: item.difficulty || difficulty,
-    }));
+    const requestedCount = Number(questionCount);
 
-    questions = questions.map((item) => ({
-  question: item.question || "",
-  difficulty: item.difficulty || difficulty,
-}));
+    const safeQuestionCount =
+      Number.isInteger(requestedCount) &&
+      requestedCount >= 1 &&
+      requestedCount <= 20
+        ? requestedCount
+        : 10;
 
-// Randomize Questions
-for (let i = questions.length - 1; i > 0; i--) {
-  const j = Math.floor(Math.random() * (i + 1));
+    // ==================================================
+    // IMPORTANT:
+    // Only use CURRENT material supplied by frontend.
+    // No old file/localStorage content is used here.
+    // ==================================================
 
-  [questions[i], questions[j]] = [
-    questions[j],
-    questions[i],
-  ];
+    let currentContent = studyContent.trim();
+
+    if (
+      currentContent.length >
+      MAX_CONTENT_LENGTH
+    ) {
+      currentContent = currentContent.substring(
+        0,
+        MAX_CONTENT_LENGTH
+      );
+    }
+
+    console.log(
+      "\n=========================================="
+    );
+
+    console.log(
+      "9.6 AI QUESTION GENERATION"
+    );
+
+    console.log(
+      "=========================================="
+    );
+
+    console.log(
+      "Material:",
+      fileName || "Topic"
+    );
+
+    console.log(
+      "Type:",
+      materialType || "Unknown"
+    );
+
+    console.log(
+      "Topic:",
+      topic || "None"
+    );
+
+    console.log(
+      "Difficulty:",
+      selectedDifficulty
+    );
+
+    console.log(
+      "Question Count:",
+      safeQuestionCount
+    );
+
+    console.log(
+      "Current Content Length:",
+      currentContent.length
+    );
+
+    console.log(
+      "==========================================\n"
+    );
+
+    // ==================================================
+    // AI PROMPT
+    // ==================================================
+
+    const prompt = `
+You are VivaPartner's university viva question generator.
+
+IMPORTANT:
+The study material below is the ONLY source of knowledge you may use.
+
+Do NOT use:
+- Previous uploaded files
+- Previous conversations
+- Your own unrelated knowledge
+- Examples from previous requests
+- Internet knowledge
+- Any old cached material
+
+Generate questions ONLY from the CURRENT MATERIAL provided below.
+
+CURRENT MATERIAL INFORMATION
+--------------------------------
+File Name:
+${fileName || "Manual Topic"}
+
+Material Type:
+${materialType || "Unknown"}
+
+Topic:
+${topic || "Not provided"}
+
+CURRENT STUDY MATERIAL
+--------------------------------
+${currentContent}
+--------------------------------
+
+TASK:
+
+Generate exactly ${safeQuestionCount} viva questions.
+
+Selected difficulty:
+${selectedDifficulty}
+
+Difficulty rules:
+
+Easy:
+- Definitions
+- Basic concepts
+- Simple understanding
+
+Medium:
+- Conceptual understanding
+- Explanation
+- Application
+- Moderate reasoning
+
+Hard:
+- Analytical questions
+- Comparison
+- Scenario based questions
+- Advanced reasoning
+
+Mixed:
+- A mixture of Easy, Medium and Hard questions
+
+STRICT RULES:
+
+1. Every question MUST be based directly on the CURRENT STUDY MATERIAL.
+2. Do not create questions from knowledge outside the material.
+3. Do not use previous uploaded material.
+4. Do not mention the file name unless it is relevant.
+5. Do not repeat questions.
+6. Generate exactly ${safeQuestionCount} questions.
+7. Questions must be suitable for a university viva.
+8. Questions must be clear and grammatically correct.
+9. Return JSON only.
+10. Do not return markdown.
+11. Do not return explanations.
+12. Do not return answers.
+
+Return exactly this JSON structure:
+
+{
+  "questions": [
+    {
+      "question": "Question text",
+      "difficulty": "${selectedDifficulty}"
+    }
+  ]
 }
+`;
 
-// ===========================
-// Assign IDs
-// ===========================
+    // ==================================================
+    // Call Ollama
+    // ==================================================
 
+    let ollamaResponse;
 
-questions = questions.map((q, index) => ({
-  id: index + 1,
-  question: q.question,
-  difficulty: q.difficulty,
-}));
+    try {
+      ollamaResponse = await axios.post(
+        `${OLLAMA_URL}/api/chat`,
+        {
+          model: OLLAMA_MODEL,
 
+          stream: false,
 
-    res.json({
+          format: "json",
+
+          keep_alive: "10m",
+
+          options: {
+            temperature: 0.2,
+            top_p: 0.9,
+          },
+
+          messages: [
+            {
+              role: "system",
+              content:
+                "You generate university viva questions strictly from the supplied study material. Return valid JSON only.",
+            },
+
+            {
+              role: "user",
+              content: prompt,
+            },
+          ],
+        },
+        {
+          timeout: 180000,
+
+          headers: {
+            "Content-Type":
+              "application/json",
+          },
+        }
+      );
+    } catch (ollamaError) {
+      console.error(
+        "\n========== OLLAMA ERROR =========="
+      );
+
+      console.error(
+        "Message:",
+        ollamaError.message
+      );
+
+      console.error(
+        "Code:",
+        ollamaError.code
+      );
+
+      console.error(
+        "Status:",
+        ollamaError.response?.status
+      );
+
+      console.error(
+        "Response:",
+        ollamaError.response?.data
+      );
+
+      console.error(
+        "==================================\n"
+      );
+
+      if (
+        ollamaError.code ===
+          "ECONNREFUSED" ||
+        ollamaError.code ===
+          "ECONNABORTED"
+      ) {
+        return res.status(503).json({
+          success: false,
+          code: "OLLAMA_UNAVAILABLE",
+          message:
+            "Ollama is not running or is not reachable. Please start Ollama and make sure the selected model is installed.",
+        });
+      }
+
+      return res.status(502).json({
+        success: false,
+        code: "OLLAMA_ERROR",
+        message:
+          ollamaError.response?.data?.error ||
+          "Ollama failed to generate questions.",
+      });
+    }
+
+    // ==================================================
+    // Validate Ollama Response
+    // ==================================================
+
+    const aiContent =
+      ollamaResponse?.data?.message?.content;
+
+    if (
+      !aiContent ||
+      typeof aiContent !== "string"
+    ) {
+      console.error(
+        "Invalid Ollama response:",
+        ollamaResponse?.data
+      );
+
+      return res.status(502).json({
+        success: false,
+        code: "INVALID_AI_RESPONSE",
+        message:
+          "Ollama returned an empty or invalid response.",
+      });
+    }
+
+    console.log(
+      "\n========== OLLAMA RAW RESPONSE =========="
+    );
+
+    console.log(aiContent);
+
+    console.log(
+      "==========================================\n"
+    );
+
+    // ==================================================
+    // Parse JSON
+    // ==================================================
+
+    let parsed;
+
+    try {
+      parsed = cleanAIResponse(
+        aiContent
+      );
+    } catch (parseError) {
+      console.error(
+        "AI JSON parsing error:",
+        parseError.message
+      );
+
+      return res.status(502).json({
+        success: false,
+        code: "INVALID_AI_JSON",
+        message:
+          "AI returned an invalid question format. Please try generating again.",
+      });
+    }
+
+    // ==================================================
+    // Get Questions
+    // ==================================================
+
+    const rawQuestions =
+      Array.isArray(parsed)
+        ? parsed
+        : parsed?.questions;
+
+    const questions =
+      normalizeQuestions(
+        rawQuestions,
+        selectedDifficulty,
+        safeQuestionCount
+      );
+
+    // ==================================================
+    // Validate Question Count
+    // ==================================================
+
+    if (!questions.length) {
+      return res.status(502).json({
+        success: false,
+        code: "NO_QUESTIONS",
+        message:
+          "AI could not generate valid questions from the current study material.",
+      });
+    }
+
+    // ==================================================
+    // Randomize
+    // ==================================================
+
+    for (
+      let i = questions.length - 1;
+      i > 0;
+      i--
+    ) {
+      const j = Math.floor(
+        Math.random() * (i + 1)
+      );
+
+      [
+        questions[i],
+        questions[j],
+      ] = [
+        questions[j],
+        questions[i],
+      ];
+    }
+
+    // Reassign IDs.
+    const finalQuestions =
+      questions.map(
+        (question, index) => ({
+          ...question,
+          id: index + 1,
+        })
+      );
+
+    // ==================================================
+    // Success
+    // ==================================================
+
+    console.log(
+      `Generated ${finalQuestions.length} questions successfully.`
+    );
+
+    return res.status(200).json({
       success: true,
-      difficulty,
-      totalQuestions: questions.length,
-      questions,
+      difficulty: selectedDifficulty,
+      totalQuestions:
+        finalQuestions.length,
+      questions: finalQuestions,
     });
+  } catch (error) {
+    console.error(
+      "\n========== AI CONTROLLER ERROR =========="
+    );
 
-  } catch (err) {
-    console.error(err);
+    console.error(error);
 
-    res.status(500).json({
+    console.error(
+      "==========================================\n"
+    );
+
+    return res.status(500).json({
       success: false,
-      message: "Failed to generate questions.",
-      error: err.message,
+      code: "AI_GENERATION_ERROR",
+      message:
+        error.message ||
+        "Failed to generate viva questions.",
     });
   }
 };

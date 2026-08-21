@@ -41,9 +41,13 @@ import StudyMaterial from "../pages/Dashboard/StudyMaterial";
 import StartViva from "../pages/Dashboard/StartViva";
 import StudentPairing from "../pages/Dashboard/StudentPairing";
 import QuestionGeneration from "../pages/Dashboard/QuestionGeneration/QuestionGeneration"
+import StudentJoin from "../pages/Dashboard/StudentJoin";
+import VivaReady from "../pages/Dashboard/VivaReady";
 import VoiceViva from "../pages/Dashboard/VoiceViva";
 import StudentManagement from "../pages/Dashboard/Teachers/StudentManagement";
 
+
+import StudentViva from "../pages/Student/StudentViva";
 
 // Layout
 import DashboardLayout from "../layouts/DashboardLayout";
@@ -191,6 +195,26 @@ const AppRoutes = () => {
 
 </Route>
 
+
+<Route
+  path="/viva/:sessionId"
+  element={<StudentJoin />}
+/>
+
+<Route
+  path="/viva/:sessionId/ready"
+  element={<VivaReady />}
+/>
+
+<Route
+  path="/viva/:sessionId"
+  element={<VoiceViva />}
+/>
+
+<Route
+  path="/viva/:sessionId"
+  element={<StudentViva />}
+/>
 
         {/* Redirect old dashboard */}
         <Route

@@ -1,12 +1,8 @@
-import axios from "axios";
-
-const API = axios.create({
-  baseURL: "http://localhost:5000/api",
-});
+import api from "./api";
 
 // Upload Students
 export const uploadStudents = (formData, onUploadProgress) =>
-  API.post("/students/upload", formData, {
+  api.post("/students/upload", formData, {
     headers: {
       "Content-Type": "multipart/form-data",
     },
@@ -21,7 +17,7 @@ export const getStudents = (
   page = 1,
   limit = 10
 ) => {
-  return API.get("/students", {
+  return api.get("/students", {
     params: {
       search,
       classId,
@@ -34,10 +30,10 @@ export const getStudents = (
 
 // Update Student
 export const updateStudent = (id, studentData) => {
-  return API.put(`/students/${id}`, studentData);
+  return api.put(`/students/${id}`, studentData);
 };
 
-//delete student
+// delete student
 export const deleteStudent = (id) => {
-  return API.delete(`/students/${id}`);
+  return api.delete(`/students/${id}`);
 };

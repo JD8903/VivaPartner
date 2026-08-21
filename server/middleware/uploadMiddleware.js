@@ -2,71 +2,179 @@ const multer = require("multer");
 const path = require("path");
 const fs = require("fs");
 
-// Create uploads folder if it doesn't exist
-if (!fs.existsSync("uploads")) {
-  fs.mkdirSync("uploads");
+// =====================================================
+// Upload Directory
+// =====================================================
+
+const uploadDir = path.join(__dirname, "../uploads");
+
+if (!fs.existsSync(uploadDir)) {
+  fs.mkdirSync(uploadDir, {
+    recursive: true,
+  });
 }
 
-const storage = multer.diskStorage({
-  destination(req, file, cb) {
-    cb(null, "uploads/");
+// =====================================================
+// Allowed File Configuration
+// =====================================================
+
+const ALLOWED_FILES = {
+  ".pdf": {
+    type: "PDF",
+    mimeTypes: [
+      "application/pdf",
+    ],
   },
 
-  filename(req, file, cb) {
-    cb(
-      null,
-      Date.now() + path.extname(file.originalname)
-    );
+  ".pptx": {
+    type: "PPTX",
+    mimeTypes: [
+      "application/vnd.openxmlformats-officedocument.presentationml.presentation",
+    ],
+  },
+
+  ".docx": {
+    type: "DOCX",
+    mimeTypes: [
+      "application/vnd.openxmlformats-officedocument.wordprocessingml.document",
+    ],
+  },
+
+  ".txt": {
+    type: "TXT",
+    mimeTypes: [
+      "text/plain",
+    ],
+  },
+};
+
+// =====================================================
+// Maximum File Size
+// =====================================================
+
+const MAX_FILE_SIZE = 10 * 1024 * 1024;
+
+// =====================================================
+// Storage
+// =====================================================
+
+const storage = multer.diskStorage({
+  destination: (_req, _file, cb) => {
+    cb(null, uploadDir);
+  },
+
+  filename: (_req, file, cb) => {
+    const extension = path
+      .extname(file.originalname)
+      .toLowerCase();
+
+    const originalBaseName = path
+      .basename(
+        file.originalname,
+        extension
+      );
+
+    const safeBaseName = originalBaseName
+      .replace(/[^a-zA-Z0-9-_]/g, "_")
+      .replace(/_+/g, "_")
+      .slice(0, 80);
+
+    const finalBaseName =
+      safeBaseName || "study-material";
+
+    const fileName =
+      `${Date.now()}-${finalBaseName}${extension}`;
+
+    cb(null, fileName);
   },
 });
 
-const fileFilter = (req, file, cb) => {
-  const allowed = [
-    // PDF
-    "application/pdf",
+// =====================================================
+// File Validation
+// =====================================================
 
-    // DOCX
-    "application/vnd.openxmlformats-officedocument.wordprocessingml.document",
+const fileFilter = (_req, file, cb) => {
+  const extension = path
+    .extname(file.originalname)
+    .toLowerCase();
 
-    // DOC (Old Word)
-    "application/msword",
+  const fileRule =
+    ALLOWED_FILES[extension];
 
-    // PPTX
-    "application/vnd.openxmlformats-officedocument.presentationml.presentation",
+  // ---------------------------------------------------
+  // Extension check
+  // ---------------------------------------------------
 
-    // PPT (Old PowerPoint)
-    "application/vnd.ms-powerpoint",
-
-    // TXT
-    "text/plain",
-
-    // Excel XLSX
-    "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
-
-    // Excel XLS
-    "application/vnd.ms-excel",
-  ];
-
-  if (allowed.includes(file.mimetype)) {
-    cb(null, true);
-  } else {
-    console.log("Blocked MIME Type:", file.mimetype);
-
-    cb(
-      new Error(
-        `Unsupported file type: ${file.mimetype}`
-      ),
-      false
+  if (!fileRule) {
+    const error = new Error(
+      "Invalid file type. Only PDF, PPTX, DOCX and TXT files are allowed."
     );
+
+    error.code = "INVALID_FILE_TYPE";
+
+    return cb(error, false);
   }
+
+  // ---------------------------------------------------
+  // MIME check
+  // ---------------------------------------------------
+
+  /*
+   * Some browsers may send an empty MIME type.
+   * Extension validation is still mandatory.
+   */
+
+  if (
+    file.mimetype &&
+    !fileRule.mimeTypes.includes(
+      file.mimetype
+    )
+  ) {
+    const error = new Error(
+      `Invalid ${fileRule.type} file. File extension and MIME type do not match.`
+    );
+
+    error.code = "INVALID_MIME_TYPE";
+
+    return cb(error, false);
+  }
+
+  // ---------------------------------------------------
+  // Valid
+  // ---------------------------------------------------
+
+  cb(null, true);
 };
+
+// =====================================================
+// Multer Configuration
+// =====================================================
 
 const upload = multer({
   storage,
-  fileFilter,
+
   limits: {
-    fileSize: 20 * 1024 * 1024, // 20MB
+    fileSize: MAX_FILE_SIZE,
   },
+
+  fileFilter,
 });
 
-module.exports = upload;
+// =====================================================
+// Single File Upload
+// =====================================================
+
+const uploadSingleFile =
+  upload.single("file");
+
+// =====================================================
+// Export
+// =====================================================
+
+module.exports = {
+  upload,
+  uploadSingleFile,
+  uploadDir,
+  MAX_FILE_SIZE,
+  ALLOWED_FILES,
+};

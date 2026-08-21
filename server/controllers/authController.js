@@ -1,8 +1,14 @@
 const bcrypt = require("bcryptjs");
 const jwt = require("jsonwebtoken");
+
 const generateOTP = require("../utils/generateOTP");
 const sendEmail = require("../utils/sendEmail");
+
 const User = require("../models/User");
+
+// ======================================================
+// LOGIN
+// ======================================================
 
 const loginUser = async (req, res) => {
   try {
@@ -16,9 +22,11 @@ const loginUser = async (req, res) => {
       });
     }
 
-    // Find User (Include Password)
+    const normalizedEmail = email.toLowerCase().trim();
+
+    // Find User
     const user = await User.findOne({
-      email: email.toLowerCase().trim(),
+      email: normalizedEmail,
     }).select("+password");
 
     // User Not Found
@@ -33,12 +41,16 @@ const loginUser = async (req, res) => {
     if (user.status === "Inactive") {
       return res.status(403).json({
         success: false,
-        message: "Your account has been deactivated. Please contact the administrator.",
+        message:
+          "Your account has been deactivated. Please contact the administrator.",
       });
     }
 
     // Compare Password
-    const isMatch = await bcrypt.compare(password, user.password);
+    const isMatch = await bcrypt.compare(
+      password,
+      user.password
+    );
 
     if (!isMatch) {
       return res.status(401).json({
@@ -47,7 +59,7 @@ const loginUser = async (req, res) => {
       });
     }
 
-    // Generate JWT Token
+    // Generate JWT
     const token = jwt.sign(
       {
         id: user._id,
@@ -56,15 +68,16 @@ const loginUser = async (req, res) => {
       },
       process.env.JWT_SECRET,
       {
-        expiresIn: process.env.JWT_EXPIRE,
+        expiresIn: process.env.JWT_EXPIRE || "7d",
       }
     );
 
-    // Success Response
     return res.status(200).json({
       success: true,
       message: "Login successful.",
+
       token,
+
       user: {
         id: user._id,
         name: user.name,
@@ -77,21 +90,42 @@ const loginUser = async (req, res) => {
       },
     });
   } catch (error) {
-    console.error("Login Error:", error);
+    console.error("❌ Login Error:", error);
 
     return res.status(500).json({
       success: false,
-      message: "Internal Server Error",
+      message: "Internal Server Error.",
+      error: error.message,
     });
   }
 };
+
+// ======================================================
+// FORGOT PASSWORD
+// ======================================================
 
 const forgotPassword = async (req, res) => {
   try {
     const { email } = req.body;
 
+    // Validate Email
+    if (!email || email.trim() === "") {
+      return res.status(400).json({
+        success: false,
+        message: "Email is required.",
+      });
+    }
+
+    const normalizedEmail = email.toLowerCase().trim();
+
+    console.log("========================================");
+    console.log("FORGOT PASSWORD REQUEST");
+    console.log("Email:", normalizedEmail);
+    console.log("========================================");
+
+    // Find User
     const user = await User.findOne({
-      email: email.toLowerCase().trim(),
+      email: normalizedEmail,
     });
 
     if (!user) {
@@ -101,34 +135,55 @@ const forgotPassword = async (req, res) => {
       });
     }
 
+    // Generate OTP
     const otp = generateOTP();
 
-    user.resetOTP = otp;
-    user.otpExpires = Date.now() + 10 * 60 * 1000;
+    console.log("Generated OTP:", otp);
+
+    // Save OTP
+    user.resetOTP = String(otp);
+
+    user.otpExpires = new Date(
+      Date.now() + 10 * 60 * 1000
+    );
 
     await user.save();
 
+    console.log("✅ OTP saved to database.");
+
+    // Send Email
     await sendEmail(user.email, otp);
 
-    res.json({
+    console.log("✅ Password reset email sent.");
+
+    return res.status(200).json({
       success: true,
       message: "OTP sent successfully.",
     });
-
   } catch (error) {
-    console.error(error);
+    console.error("========================================");
+    console.error("❌ FORGOT PASSWORD ERROR");
+    console.error("Message:", error.message);
+    console.error("Stack:", error.stack);
+    console.error("========================================");
 
-    res.status(500).json({
+    return res.status(500).json({
       success: false,
       message: "Unable to send OTP.",
+      error: error.message,
     });
   }
 };
+
+// ======================================================
+// VERIFY OTP
+// ======================================================
+
 const verifyOTP = async (req, res) => {
   try {
     const { email, otp } = req.body;
 
-    // Validate request
+    // Validate Request
     if (!email || !otp) {
       return res.status(400).json({
         success: false,
@@ -136,9 +191,11 @@ const verifyOTP = async (req, res) => {
       });
     }
 
-    // Find user
+    const normalizedEmail = email.toLowerCase().trim();
+
+    // Find User
     const user = await User.findOne({
-      email: email.toLowerCase().trim(),
+      email: normalizedEmail,
     });
 
     if (!user) {
@@ -149,41 +206,48 @@ const verifyOTP = async (req, res) => {
     }
 
     // Check OTP
-    if (user.resetOTP !== otp) {
+    if (String(user.resetOTP) !== String(otp)) {
       return res.status(400).json({
         success: false,
         message: "Invalid OTP.",
       });
     }
 
-    // Check OTP expiry
-    if (!user.otpExpires || user.otpExpires < Date.now()) {
+    // Check Expiry
+    if (
+      !user.otpExpires ||
+      user.otpExpires.getTime() < Date.now()
+    ) {
       return res.status(400).json({
         success: false,
         message: "OTP has expired.",
       });
     }
 
-    res.status(200).json({
+    return res.status(200).json({
       success: true,
       message: "OTP verified successfully.",
     });
-
   } catch (error) {
-    console.error("Verify OTP Error:", error);
+    console.error("❌ Verify OTP Error:", error);
 
-    res.status(500).json({
+    return res.status(500).json({
       success: false,
       message: "Internal Server Error.",
+      error: error.message,
     });
   }
 };
+
+// ======================================================
+// RESET PASSWORD
+// ======================================================
 
 const resetPassword = async (req, res) => {
   try {
     const { email, password } = req.body;
 
-    // Validate input
+    // Validate
     if (!email || !password) {
       return res.status(400).json({
         success: false,
@@ -191,7 +255,7 @@ const resetPassword = async (req, res) => {
       });
     }
 
-    // Password length validation
+    // Password Length
     if (password.length < 6) {
       return res.status(400).json({
         success: false,
@@ -199,9 +263,11 @@ const resetPassword = async (req, res) => {
       });
     }
 
-    // Find user
+    const normalizedEmail = email.toLowerCase().trim();
+
+    // Find User
     const user = await User.findOne({
-      email: email.toLowerCase().trim(),
+      email: normalizedEmail,
     });
 
     if (!user) {
@@ -211,33 +277,41 @@ const resetPassword = async (req, res) => {
       });
     }
 
-    // Hash password
+    // Hash Password
     const salt = await bcrypt.genSalt(10);
-    const hashedPassword = await bcrypt.hash(password, salt);
 
-    // Update password
+    const hashedPassword = await bcrypt.hash(
+      password,
+      salt
+    );
+
+    // Update Password
     user.password = hashedPassword;
 
-    // Clear OTP data
-    user.resetOTP = undefined;
-    user.otpExpires = undefined;
+    // Clear OTP
+    user.resetOTP = null;
+    user.otpExpires = null;
 
     await user.save();
 
-    res.status(200).json({
+    return res.status(200).json({
       success: true,
       message: "Password reset successfully.",
     });
-
   } catch (error) {
-    console.error("Reset Password Error:", error);
+    console.error("❌ Reset Password Error:", error);
 
-    res.status(500).json({
+    return res.status(500).json({
       success: false,
       message: "Internal Server Error.",
+      error: error.message,
     });
   }
 };
+
+// ======================================================
+// EXPORT
+// ======================================================
 
 module.exports = {
   loginUser,

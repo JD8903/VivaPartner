@@ -3,6 +3,8 @@ dotenv.config();
 
 const express = require("express");
 const cors = require("cors");
+const path = require("path");
+const multer = require("multer");
 
 const connectDB = require("./config/db");
 
@@ -18,13 +20,16 @@ const exportRoutes = require("./routes/exportRoutes");
 const teacherDashboardRoutes = require("./routes/teacherDashboardRoutes");
 const vivaSessionRoutes = require("./routes/vivaSessionRoutes");
 const pdfRoutes = require("./routes/pdfRoutes");
-const docxRoutes = require("./routes/docxRoutes");
 const pptxRoutes = require("./routes/pptxRoutes");
+const docxRoutes = require("./routes/docxRoutes");
 const aiRoutes = require("./routes/aiRoutes");
 const questionRoutes = require("./routes/questionRoutes");
 const studentRoutes = require("./routes/studentRoutes");
 const studentGroupRoutes = require("./routes/studentGroupRoutes");
-
+const vivaConfigurationRoutes = require("./routes/vivaConfigurationRoutes");
+const studyMaterialRoutes = require("./routes/studyMaterialRoutes");
+const publicVivaRoutes = require("./routes/publicVivaRoutes");
+const resultsRoutes = require("./routes/resultsRoutes");
 
 // Connect Database
 connectDB();
@@ -37,6 +42,7 @@ const app = express();
 // =======================
 app.use(cors());
 app.use(express.json());
+app.use("/uploads", express.static(path.join(__dirname, "uploads")));
 
 // =======================
 // API Routes
@@ -51,14 +57,16 @@ app.use("/api/reports", reportsRoutes);
 app.use("/api/export", exportRoutes);
 app.use("/api/teacher", teacherDashboardRoutes);
 app.use("/api/viva-sessions", vivaSessionRoutes);
-app.use("/api/pdf", pdfRoutes);
+app.use("/api/viva/public",publicVivaRoutes);
 app.use("/api/docx", docxRoutes);
+app.use("/api/pdf", pdfRoutes);
 app.use("/api/pptx", pptxRoutes);
 app.use("/api/ai", aiRoutes)
 app.use("/api/questions", questionRoutes);
 app.use("/api/students", studentRoutes);
 app.use("/api/student-groups",studentGroupRoutes);
-
+app.use("/api/study-material",studyMaterialRoutes);
+app.use("/api/results", resultsRoutes);
 
 // =======================
 // Test Route
@@ -68,6 +76,99 @@ app.get("/", (req, res) => {
     success: true,
     message: "Welcome to VivaPartner Backend 🚀",
   });
+});
+
+
+// Viva configuration must be registered before the 404 handler.
+app.use("/api/viva/configure", vivaConfigurationRoutes);
+
+// =======================
+// Upload / Multer errors
+// =======================
+
+app.use((err, req, res, next) => {
+  // ---------------------------------------------------
+  // File too large
+  // ---------------------------------------------------
+
+  if (
+    err instanceof multer.MulterError
+  ) {
+    if (err.code === "LIMIT_FILE_SIZE") {
+      return res.status(400).json({
+        success: false,
+        message:
+          "File is too large. Maximum file size is 10 MB.",
+        code: "LIMIT_FILE_SIZE",
+      });
+    }
+
+    if (
+      err.code === "LIMIT_UNEXPECTED_FILE"
+    ) {
+      return res.status(400).json({
+        success: false,
+        message:
+          "Unexpected file upload. Please use the file field.",
+        code: "LIMIT_UNEXPECTED_FILE",
+      });
+    }
+
+    return res.status(400).json({
+      success: false,
+      message:
+        "Invalid file upload.",
+      code: err.code,
+    });
+  }
+
+  // ---------------------------------------------------
+  // Custom file validation errors
+  // ---------------------------------------------------
+
+  if (
+    err &&
+    err.code === "INVALID_FILE_TYPE"
+  ) {
+    return res.status(400).json({
+      success: false,
+      message:
+        "Invalid file type. Only PDF, PPTX, DOCX and TXT files are allowed.",
+      code: "INVALID_FILE_TYPE",
+    });
+  }
+
+  if (
+    err &&
+    err.code === "INVALID_MIME_TYPE"
+  ) {
+    return res.status(400).json({
+      success: false,
+      message:
+        "Invalid file. The file extension and file type do not match.",
+      code: "INVALID_MIME_TYPE",
+    });
+  }
+
+  // ---------------------------------------------------
+  // Other server errors
+  // ---------------------------------------------------
+
+  if (err) {
+    console.error(
+      "Unhandled Server Error:",
+      err
+    );
+
+    return res.status(500).json({
+      success: false,
+      message:
+        err.message ||
+        "Internal server error.",
+    });
+  }
+
+  next();
 });
 
 // =======================

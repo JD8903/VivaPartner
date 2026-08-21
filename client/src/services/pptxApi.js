@@ -1,21 +1,27 @@
-import axios from "axios";
-
-const API = "http://localhost:5000/api/pptx";
+import api from "./api";
 
 export const extractPPTX = async (file) => {
+  if (!file) {
+    throw new Error("No PowerPoint file selected.");
+  }
+
   const formData = new FormData();
 
-  formData.append("pptx", file);
+  formData.append("file", file);
 
-  const response = await axios.post(
-    `${API}/extract`,
-    formData,
-    {
-      headers: {
-        "Content-Type": "multipart/form-data",
-      },
-    }
-  );
+  try {
+    const response = await api.post(
+      "/pptx/extract",
+      formData
+    );
 
-  return response.data;
+    return response.data;
+  } catch (error) {
+    throw new Error(
+      error.response?.data?.message ||
+        error.response?.data?.error ||
+        error.message ||
+        "Failed to extract PowerPoint text."
+    );
+  }
 };

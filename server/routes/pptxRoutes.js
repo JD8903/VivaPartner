@@ -2,15 +2,21 @@ const express = require("express");
 
 const router = express.Router();
 
-const upload = require("../middleware/uploadMiddleware");
-
 const {
   extractPPTX,
 } = require("../controllers/pptxController");
 
+const {
+  uploadSingleFile,
+} = require("../middleware/uploadMiddleware");
+
+// ======================================================
+// POST /api/pptx/extract
+// ======================================================
+
 router.post(
   "/extract",
-  upload.single("pptx"),
+  uploadSingleFile,
   extractPPTX
 );
 

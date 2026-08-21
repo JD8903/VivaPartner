@@ -4,7 +4,13 @@ export const getToken = () => {
 
 export const getUser = () => {
   const user = localStorage.getItem("user");
-  return user ? JSON.parse(user) : null;
+
+  try {
+    return user ? JSON.parse(user) : null;
+  } catch (error) {
+    console.error("Failed to parse user data:", error);
+    return null;
+  }
 };
 
 export const getRole = () => {

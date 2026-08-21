@@ -1,48 +1,103 @@
 const fs = require("fs");
+const path = require("path");
 const officeParser = require("officeparser");
 
+const permanentDir = path.join(
+  __dirname,
+  "../uploads/study-material"
+);
+
+const moveToStudyMaterial = (filePath, fileName) => {
+  fs.mkdirSync(permanentDir, { recursive: true });
+  const destination = path.join(
+    permanentDir,
+    `${Date.now()}-${path.basename(fileName)}`
+  );
+  fs.renameSync(filePath, destination);
+  return `/uploads/study-material/${path.basename(destination)}`;
+};
+
 const extractPPTX = async (req, res) => {
+  let filePath = null;
+  let moved = false;
+
   try {
     if (!req.file) {
       return res.status(400).json({
         success: false,
-        message: "No PPTX uploaded.",
+        message: "No PowerPoint file uploaded.",
       });
     }
 
-    // Parse the PPTX file
-    const ast = await officeParser.parseOffice(req.file.path);
+    filePath = req.file.path;
 
-    // Convert parsed content to plain text
-    const result = await ast.to("text");
+    const ext = path.extname(req.file.originalname).toLowerCase();
 
-    // Delete uploaded file
-    fs.unlink(req.file.path, (err) => {
-      if (err) {
-        console.error("Failed to delete uploaded PPTX:", err);
-      }
-    });
+    if (ext !== ".pptx") {
+      return res.status(400).json({
+        success: false,
+        message: "Only PPTX files are supported. Please upload a PPTX file.",
+      });
+    }
+
+    if (
+      !officeParser ||
+      typeof officeParser.parseOffice !== "function"
+    ) {
+      throw new Error(
+        "PowerPoint parser is not available. Run npm install in the server folder."
+      );
+    }
+
+    const ast = await officeParser.parseOffice(filePath);
+    const parsed = await ast.to("text");
+
+    const text = String(
+      parsed && typeof parsed === "object" && "value" in parsed
+        ? parsed.value
+        : parsed || ""
+    )
+      .replace(/\r/g, "")
+      .replace(/\n{3,}/g, "\n\n")
+      .trim();
+
+    if (!text) {
+      return res.status(422).json({
+        success: false,
+        message: "Unable to extract text from this PowerPoint. Please upload another file.",
+      });
+    }
+
+    const savedPath = moveToStudyMaterial(
+      filePath,
+      req.file.originalname
+    );
+    moved = true;
 
     return res.status(200).json({
       success: true,
-      text: result.value || "",
+      message: "PowerPoint text extracted successfully.",
+      fileName: req.file.originalname,
+      fileType: "PPTX",
+      materialType: "PPTX",
+      fileSize: req.file.size,
+      filePath: savedPath,
+      text,
+      textLength: text.length,
+      status: "Ready",
     });
-
   } catch (error) {
     console.error("PPTX Extraction Error:", error);
-
-    if (req.file && fs.existsSync(req.file.path)) {
-      fs.unlink(req.file.path, () => {});
-    }
-
     return res.status(500).json({
       success: false,
-      message: "Failed to extract PPTX.",
+      message: "Failed to extract PowerPoint text.",
       error: error.message,
     });
+  } finally {
+    if (filePath && !moved && fs.existsSync(filePath)) {
+      try { fs.unlinkSync(filePath); } catch (_) {}
+    }
   }
 };
 
-module.exports = {
-  extractPPTX,
-};
+module.exports = { extractPPTX };

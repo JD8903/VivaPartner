@@ -2,15 +2,21 @@ const express = require("express");
 
 const router = express.Router();
 
-const upload = require("../middleware/uploadMiddleware");
-
 const {
   extractDOCX,
 } = require("../controllers/docxController");
 
+const {
+  uploadSingleFile,
+} = require("../middleware/uploadMiddleware");
+
+// ======================================================
+// POST /api/docx/extract
+// ======================================================
+
 router.post(
   "/extract",
-  upload.single("docx"),
+  uploadSingleFile,
   extractDOCX
 );
 
