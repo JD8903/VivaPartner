@@ -143,3 +143,61 @@ export const getVivaQuestion = async (
     );
   }
 };
+
+// ======================================================
+// Get All Teacher Viva Sessions (Phase 14)
+// ======================================================
+
+export const getTeacherVivaSessions = async () => {
+  try {
+    const response = await api.get("/viva-sessions");
+    return response.data;
+  } catch (error) {
+    throw new Error(
+      error.response?.data?.message ||
+        error.response?.data?.error ||
+        error.message ||
+        "Failed to fetch viva sessions."
+    );
+  }
+};
+
+// ======================================================
+// Get Detailed Viva Session Analytics (Phase 14)
+// ======================================================
+
+export const getSessionAnalytics = async (sessionId) => {
+  try {
+    const response = await api.get(
+      `/viva-sessions/${encodeURIComponent(sessionId)}/analytics`
+    );
+    return response.data;
+  } catch (error) {
+    throw new Error(
+      error.response?.data?.message ||
+        error.response?.data?.error ||
+        error.message ||
+        "Failed to fetch viva analytics."
+    );
+  }
+};
+
+// ======================================================
+// Trigger AI Evaluation for Session (Phase 13/14)
+// ======================================================
+
+export const evaluateSessionAttempts = async (sessionId) => {
+  try {
+    const response = await api.post(
+      `/viva-sessions/${encodeURIComponent(sessionId)}/evaluate`
+    );
+    return response.data;
+  } catch (error) {
+    throw new Error(
+      error.response?.data?.message ||
+        error.response?.data?.error ||
+        error.message ||
+        "Failed to evaluate session."
+    );
+  }
+};

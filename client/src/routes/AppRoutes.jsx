@@ -45,7 +45,8 @@ import StudentJoin from "../pages/Dashboard/StudentJoin";
 import VivaReady from "../pages/Dashboard/VivaReady";
 import VoiceViva from "../pages/Dashboard/VoiceViva";
 import StudentManagement from "../pages/Dashboard/Teachers/StudentManagement";
-
+import ShareVivaLink from "../pages/Dashboard/ShareVivaLink";
+import TeacherVivaResults from "../pages/Dashboard/Teachers/TeacherVivaResults";
 
 import StudentViva from "../pages/Student/StudentViva";
 
@@ -159,7 +160,7 @@ const AppRoutes = () => {
 
   <Route
     path="viva-setup"
-    element={<VivaSetup />}
+    element={<StartViva />}
   />
 
   <Route
@@ -178,41 +179,75 @@ const AppRoutes = () => {
 />
 
 <Route
-  path="/teacher/question-generation"
+  path="question-generation"
   element={<QuestionGeneration />}
 />
 
 <Route
-  path="/teacher/voice-viva"
+  path="voice-viva"
   element={<VoiceViva />}
 />
 
 <Route
-  path="/teacher/students"
+  path="students"
   element={<StudentManagement />}
 />
 
+<Route
+  path="share-viva"
+  element={<ShareVivaLink />}
+/>
+
+<Route
+  path="share-viva/:sessionId"
+  element={<ShareVivaLink />}
+/>
+
+<Route
+  path="results"
+  element={<TeacherVivaResults />}
+/>
+
+<Route
+  path="results/:sessionId"
+  element={<TeacherVivaResults />}
+/>
+
+<Route
+  path="analytics"
+  element={<TeacherVivaResults />}
+/>
+
+<Route
+  path="analytics/:sessionId"
+  element={<TeacherVivaResults />}
+/>
 
 </Route>
 
 
 <Route
   path="/viva/:sessionId"
-  element={<StudentJoin />}
+  element={<StudentViva />}
 />
 
 <Route
   path="/viva/:sessionId/ready"
-  element={<VivaReady />}
+  element={<StudentViva />}
 />
 
 <Route
-  path="/viva/:sessionId"
-  element={<VoiceViva />}
+  path="/viva/:sessionId/voice"
+  element={<StudentViva />}
 />
 
 <Route
-  path="/viva/:sessionId"
+  path="/viva/:sessionId/live"
+  element={<StudentViva />}
+/>
+
+<Route
+  path="/viva/:sessionId/attempt"
   element={<StudentViva />}
 />
 

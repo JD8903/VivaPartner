@@ -182,7 +182,8 @@ const StudyMaterial = () => {
 
       // -------------------------------------------------
       // IMPORTANT:
-      // Remove OLD study-material data first.
+      // Remove OLD study-material data and OLD questions first.
+      // Under no circumstances should questions come from previous sessions.
       // -------------------------------------------------
 
       localStorage.removeItem("studyMaterial");
@@ -193,6 +194,9 @@ const StudyMaterial = () => {
       localStorage.removeItem("pptxText");
       localStorage.removeItem("docxText");
       localStorage.removeItem("txtText");
+
+      localStorage.removeItem("generatedQuestions");
+      localStorage.removeItem("questions");
 
       // -------------------------------------------------
       // Topic-only flow

@@ -1,6 +1,6 @@
 const express = require("express");
 const upload = require("../middleware/excelUpload");
-const { protect } = require("../middleware/authMiddleware");
+const { protect, authorize } = require("../middleware/authMiddleware");
 
 const {
   uploadStudents,
@@ -10,21 +10,24 @@ const {
 } = require("../controllers/studentController");
 const router = express.Router();
 
+// All student management routes require authentication and teacher/admin role
+router.use(protect);
+router.use(authorize("teacher", "admin"));
+
 // Upload Students from Excel
 router.post(
   "/upload",
-  protect,
   upload.single("excel"),
   uploadStudents
 );
 
 // Get All Students (Search + Filter + Pagination)
-router.get("/", protect, getStudents);
+router.get("/", getStudents);
 
 // Update Student
-router.put("/:id", protect, updateStudent);
+router.put("/:id", updateStudent);
 
 // Delete Student
-router.delete("/:id", protect, deleteStudent);
+router.delete("/:id", deleteStudent);
 
 module.exports = router;

@@ -1025,6 +1025,86 @@ const StudentViva = () => {
     };
 
   // =====================================================
+  // SKIP QUESTION (Phase 11)
+  // =====================================================
+
+  const handleSkipQuestion = async () => {
+    if (savingAnswer || movingNext || completing || !currentQuestion) {
+      return;
+    }
+
+    try {
+      setMovingNext(true);
+      setError("");
+
+      stopListening();
+      stopQuestionSpeech();
+
+      // Save a placeholder so backend knows question was addressed
+      await saveStudentAnswer(
+        sessionId,
+        attempt.attemptId,
+        {
+          questionId: currentQuestion.id,
+          questionNumber: currentQuestion.questionNumber,
+          question: currentQuestion.question,
+          transcript: "[Skipped by student]",
+        }
+      );
+
+      const isLastQuestion =
+        currentQuestion?.questionNumber >=
+        currentQuestion?.totalQuestions;
+
+      if (isLastQuestion) {
+        await handleCompleteViva();
+        return;
+      }
+
+      const response = await nextVivaQuestion(
+        sessionId,
+        attempt.attemptId
+      );
+
+      if (!response?.success) {
+        setError(response?.message || "Unable to skip to next question.");
+        return;
+      }
+
+      if (response.completed) {
+        await handleCompleteViva();
+        return;
+      }
+
+      setCurrentQuestion(response.question);
+      setTranscript("");
+      setInterimTranscript("");
+      setAnswerSaved(false);
+
+      const updatedAttempt = {
+        ...attempt,
+        currentQuestionIndex: response.question.questionNumber - 1,
+      };
+
+      setAttempt(updatedAttempt);
+
+      sessionStorage.setItem(
+        `vivaAttempt_${sessionId}`,
+        JSON.stringify(updatedAttempt)
+      );
+
+      setTimeout(() => {
+        speakQuestion(response.question?.question);
+      }, 250);
+    } catch (err) {
+      console.error("Skip Question Error:", err);
+      setError(err.message || "Unable to skip question.");
+    } finally {
+      setMovingNext(false);
+    }
+  };
+
+  // =====================================================
   // 10.7.7
   // COMPLETE VIVA
   // =====================================================
@@ -1958,6 +2038,22 @@ const StudentViva = () => {
                         ? "✓ Answer Saved"
                         : "💾 Save Answer"}
                     </button>
+
+                    {session?.rules?.allowSkip !== false && (
+                      <button
+                        type="button"
+                        onClick={handleSkipQuestion}
+                        disabled={savingAnswer || movingNext || completing}
+                        style={{
+                          ...styles.clearButton,
+                          background: "#f1f5f9",
+                          color: "#475569",
+                          fontWeight: "600",
+                        }}
+                      >
+                        ⏭ Skip
+                      </button>
+                    )}
 
                     <button
                       type="button"

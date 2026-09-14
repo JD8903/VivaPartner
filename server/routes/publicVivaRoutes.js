@@ -1,97 +1,81 @@
-// ============================================================
-// VivaPartner - Public Viva Routes
-// Phase 11.7 - Answer Submission API
-// ============================================================
-
 const express = require("express");
 
 const {
   getPublicVivaSession,
-  joinVivaSession,
+  joinPublicViva,
   startPublicViva,
-  getNextVivaQuestion,
-  submitPublicVivaAnswer,
+  getCurrentVivaQuestion,
+  saveStudentAnswer,
+  nextVivaQuestion,
   completePublicViva,
-} = require("../controllers/vivaSessionController");
+} = require("../controllers/publicVivaController");
 
 const router = express.Router();
 
 // =====================================================
-// GET PUBLIC VIVA SESSION
-// GET /api/viva/public/:sessionId
+// PUBLIC VIVA ROUTES
 // =====================================================
 
+// GET /api/viva/public/:sessionId
 router.get(
   "/:sessionId",
   getPublicVivaSession
 );
 
-// =====================================================
-// STUDENT JOIN VIVA
 // POST /api/viva/public/:sessionId/join
-// =====================================================
-
 router.post(
   "/:sessionId/join",
-  joinVivaSession
+  joinPublicViva
 );
 
-// =====================================================
-// START STUDENT VIVA
 // POST /api/viva/public/:sessionId/start
-// =====================================================
-
 router.post(
   "/:sessionId/start",
   startPublicViva
 );
 
 // =====================================================
+// 10.7.2
 // GET CURRENT QUESTION
-// GET /api/viva/public/:sessionId/question
-// ?attemptId=...
 // =====================================================
 
+// GET /api/viva/public/:sessionId/question?attemptId=...
 router.get(
   "/:sessionId/question",
-  getNextVivaQuestion
+  getCurrentVivaQuestion
 );
 
 // =====================================================
-// 11.7 — SUBMIT STUDENT ANSWER
-//
-// POST /api/viva/public/:sessionId/answer
-//
-// Body:
-//
-// {
-//   attemptId,
-//   enrollmentNo,
-//   questionId,
-//   question,
-//   answer,
-//   questionNumber
-// }
+// 10.7.5
+// SAVE STUDENT ANSWER
 // =====================================================
 
+// POST /api/viva/public/:sessionId/answer
 router.post(
   "/:sessionId/answer",
-  submitPublicVivaAnswer
+  saveStudentAnswer
 );
 
 // =====================================================
-// COMPLETE VIVA
-//
-// POST /api/viva/public/:sessionId/complete
+// 10.7.6
+// MOVE TO NEXT QUESTION
 // =====================================================
 
+// POST /api/viva/public/:sessionId/next
+router.post(
+  "/:sessionId/next",
+  nextVivaQuestion
+);
+
+// =====================================================
+// 10.7.7
+// COMPLETE VIVA
+// =====================================================
+
+// POST /api/viva/public/:sessionId/complete
 router.post(
   "/:sessionId/complete",
   completePublicViva
 );
-
-// =====================================================
-// EXPORT ROUTER
-// =====================================================
 
 module.exports = router;

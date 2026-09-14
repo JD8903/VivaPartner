@@ -1,61 +1,11 @@
-// ============================================================
-// VivaPartner - Public Viva API
-// Phase 11.7 - Answer Submission API
-// ============================================================
+import axios from "axios";
 
-const API_BASE_URL = (
-  import.meta.env.VITE_API_URL ||
-  "http://localhost:5000/api"
-).replace(/\/+$/, "");
+const API =
+  "http://localhost:5000/api/viva/public";
 
-// ============================================================
-// COMMON REQUEST HELPER
-// ============================================================
-
-const request = async (
-  path,
-  options = {}
-) => {
-  const response = await fetch(
-    `${API_BASE_URL}${path}`,
-    {
-      headers: {
-        "Content-Type": "application/json",
-        ...(options.headers || {}),
-      },
-      ...options,
-    }
-  );
-
-  let data = null;
-
-  try {
-    data = await response.json();
-  } catch {
-    data = null;
-  }
-
-  if (!response.ok) {
-    const error = new Error(
-      data?.message ||
-        data?.error ||
-        `Request failed with status ${response.status}.`
-    );
-
-    error.response = {
-      status: response.status,
-      data,
-    };
-
-    throw error;
-  }
-
-  return data;
-};
-
-// ============================================================
+// =====================================================
 // GET PUBLIC VIVA SESSION
-// ============================================================
+// =====================================================
 
 export const getPublicVivaSession = async (
   sessionId
@@ -66,16 +16,24 @@ export const getPublicVivaSession = async (
     );
   }
 
-  return request(
-    `/viva/public/${encodeURIComponent(
-      sessionId
-    )}`
-  );
+  try {
+    const response = await axios.get(
+      `${API}/${encodeURIComponent(sessionId)}`
+    );
+
+    return response.data;
+  } catch (error) {
+    throw new Error(
+      error.response?.data?.message ||
+        error.message ||
+        "Unable to load Viva Session."
+    );
+  }
 };
 
-// ============================================================
+// =====================================================
 // JOIN PUBLIC VIVA
-// ============================================================
+// =====================================================
 
 export const joinPublicViva = async (
   sessionId,
@@ -87,35 +45,39 @@ export const joinPublicViva = async (
     );
   }
 
-  const cleanEnrollmentNumber =
-    String(
-      enrollmentNumber || ""
-    ).trim();
-
-  if (!cleanEnrollmentNumber) {
+  if (
+    !enrollmentNumber ||
+    !enrollmentNumber.trim()
+  ) {
     throw new Error(
       "Enrollment number is required."
     );
   }
 
-  return request(
-    `/viva/public/${encodeURIComponent(
-      sessionId
-    )}/join`,
-    {
-      method: "POST",
-
-      body: JSON.stringify({
+  try {
+    const response = await axios.post(
+      `${API}/${encodeURIComponent(
+        sessionId
+      )}/join`,
+      {
         enrollmentNumber:
-          cleanEnrollmentNumber,
-      }),
-    }
-  );
+          enrollmentNumber.trim(),
+      }
+    );
+
+    return response.data;
+  } catch (error) {
+    throw new Error(
+      error.response?.data?.message ||
+        error.message ||
+        "Unable to join Viva."
+    );
+  }
 };
 
-// ============================================================
+// =====================================================
 // START PUBLIC VIVA
-// ============================================================
+// =====================================================
 
 export const startPublicViva = async (
   sessionId,
@@ -133,285 +95,212 @@ export const startPublicViva = async (
     );
   }
 
-  return request(
-    `/viva/public/${encodeURIComponent(
-      sessionId
-    )}/start`,
-    {
-      method: "POST",
-
-      body: JSON.stringify({
+  try {
+    const response = await axios.post(
+      `${API}/${encodeURIComponent(
+        sessionId
+      )}/start`,
+      {
         attemptId,
-      }),
-    }
-  );
+      }
+    );
+
+    return response.data;
+  } catch (error) {
+    throw new Error(
+      error.response?.data?.message ||
+        error.message ||
+        "Unable to start Viva."
+    );
+  }
 };
 
-// ============================================================
-// GET CURRENT VIVA QUESTION
-// ============================================================
+// =====================================================
+// 10.7.2
+// GET CURRENT QUESTION
+// =====================================================
 
-export const getCurrentVivaQuestion =
-  async (
-    sessionId,
-    attemptId
-  ) => {
-    if (!sessionId) {
-      throw new Error(
-        "Viva Session ID is required."
-      );
-    }
-
-    if (!attemptId) {
-      throw new Error(
-        "Viva attempt ID is required."
-      );
-    }
-
-    const params =
-      new URLSearchParams({
-        attemptId:
-          String(attemptId),
-      });
-
-    return request(
-      `/viva/public/${encodeURIComponent(
-        sessionId
-      )}/question?${params.toString()}`
+export const getCurrentVivaQuestion = async (
+  sessionId,
+  attemptId
+) => {
+  if (!sessionId) {
+    throw new Error(
+      "Viva Session ID is required."
     );
-  };
+  }
 
-// ============================================================
-// GET NEXT VIVA QUESTION
-//
-// Compatibility function for StudentViva.jsx.
-//
-// Backend uses the same current-question endpoint,
-// because the backend determines the current question
-// from the student's VivaAttempt.
-// ============================================================
+  if (!attemptId) {
+    throw new Error(
+      "Viva attempt ID is required."
+    );
+  }
+
+  try {
+    const response = await axios.get(
+      `${API}/${encodeURIComponent(
+        sessionId
+      )}/question`,
+      {
+        params: {
+          attemptId,
+        },
+      }
+    );
+
+    return response.data;
+  } catch (error) {
+    throw new Error(
+      error.response?.data?.message ||
+        error.message ||
+        "Unable to load Viva question."
+    );
+  }
+};
+
+// =====================================================
+// 10.7.5
+// SAVE STUDENT ANSWER
+// =====================================================
+
+export const saveStudentAnswer = async (
+  sessionId,
+  attemptId,
+  answer
+) => {
+  if (!sessionId) {
+    throw new Error(
+      "Viva Session ID is required."
+    );
+  }
+
+  if (!attemptId) {
+    throw new Error(
+      "Viva attempt ID is required."
+    );
+  }
+
+  if (!answer?.questionId && !answer?.questionNumber) {
+    throw new Error(
+      "Question information is required."
+    );
+  }
+
+  try {
+    const response = await axios.post(
+      `${API}/${encodeURIComponent(
+        sessionId
+      )}/answer`,
+      {
+        attemptId,
+        questionId:
+          answer.questionId || null,
+        questionNumber:
+          answer.questionNumber,
+        question:
+          answer.question || "",
+        transcript:
+          answer.transcript || "",
+      }
+    );
+
+    return response.data;
+  } catch (error) {
+    throw new Error(
+      error.response?.data?.message ||
+        error.message ||
+        "Unable to save your answer."
+    );
+  }
+};
+
+// =====================================================
+// 10.7.6
+// NEXT QUESTION
+// =====================================================
 
 export const nextVivaQuestion = async (
   sessionId,
   attemptId
 ) => {
-  return getCurrentVivaQuestion(
-    sessionId,
-    attemptId
-  );
-};
+  if (!sessionId) {
+    throw new Error(
+      "Viva Session ID is required."
+    );
+  }
 
-// ============================================================
-// 11.7 — SUBMIT STUDENT ANSWER
-// ============================================================
-//
-// Sends:
-//
-// sessionId
-// attemptId
-// enrollmentNo
-// questionId
-// question
-// answer
-// questionNumber
-//
-// Backend validates everything and permanently
-// saves the answer inside VivaAttempt.
-//
-// Marks/evaluation are NEVER returned to the student.
-// ============================================================
+  if (!attemptId) {
+    throw new Error(
+      "Viva attempt ID is required."
+    );
+  }
 
-export const submitPublicVivaAnswer =
-  async (
-    sessionId,
-    payload = {}
-  ) => {
-    // ----------------------------------------------------------
-    // SESSION VALIDATION
-    // ----------------------------------------------------------
-
-    if (
-      !sessionId ||
-      !String(sessionId).trim()
-    ) {
-      throw new Error(
-        "Viva Session ID is required."
-      );
-    }
-
-    // ----------------------------------------------------------
-    // ANSWER VALIDATION
-    // ----------------------------------------------------------
-
-    const answer =
-      String(
-        payload.answer || ""
-      ).trim();
-
-    if (!answer) {
-      throw new Error(
-        "Answer cannot be empty."
-      );
-    }
-
-    // ----------------------------------------------------------
-    // ENROLLMENT VALIDATION
-    // ----------------------------------------------------------
-
-    const enrollmentNo =
-      String(
-        payload.enrollmentNo || ""
-      ).trim();
-
-    if (!enrollmentNo) {
-      throw new Error(
-        "Enrollment number is required."
-      );
-    }
-
-    // ----------------------------------------------------------
-    // ATTEMPT VALIDATION
-    // ----------------------------------------------------------
-
-    const attemptId =
-      payload.attemptId || "";
-
-    if (!attemptId) {
-      throw new Error(
-        "Viva attempt ID is required."
-      );
-    }
-
-    // ----------------------------------------------------------
-    // QUESTION NUMBER VALIDATION
-    // ----------------------------------------------------------
-
-    const questionNumber =
-      Number(
-        payload.questionNumber
-      );
-
-    if (
-      !Number.isInteger(
-        questionNumber
-      ) ||
-      questionNumber < 1
-    ) {
-      throw new Error(
-        "Valid question number is required."
-      );
-    }
-
-    // ----------------------------------------------------------
-    // SEND TO BACKEND
-    // ----------------------------------------------------------
-
-    return request(
-      `/viva/public/${encodeURIComponent(
+  try {
+    const response = await axios.post(
+      `${API}/${encodeURIComponent(
         sessionId
-      )}/answer`,
+      )}/next`,
       {
-        method: "POST",
-
-        body: JSON.stringify({
-          attemptId,
-
-          enrollmentNo,
-
-          questionId:
-            payload.questionId ||
-            null,
-
-          question:
-            String(
-              payload.question || ""
-            ).trim(),
-
-          answer,
-
-          questionNumber,
-        }),
+        attemptId,
       }
     );
-  };
 
-// ============================================================
-// SAVE STUDENT ANSWER
-//
-// Compatibility alias for StudentViva.jsx.
-//
-// Both names use exactly the same backend API.
-// ============================================================
-
-export const saveStudentAnswer =
-  async (
-    sessionId,
-    payload = {}
-  ) => {
-    return submitPublicVivaAnswer(
-      sessionId,
-      payload
+    return response.data;
+  } catch (error) {
+    throw new Error(
+      error.response?.data?.message ||
+        error.message ||
+        "Unable to load next question."
     );
-  };
+  }
+};
 
-// ============================================================
-// COMPLETE PUBLIC VIVA
-// ============================================================
+// =====================================================
+// 10.7.7
+// COMPLETE VIVA
+// =====================================================
 
-export const completePublicViva =
-  async (
-    sessionId,
-    enrollmentNo
-  ) => {
-    if (!sessionId) {
-      throw new Error(
-        "Viva Session ID is required."
-      );
-    }
+export const completePublicViva = async (
+  sessionId,
+  attemptId
+) => {
+  if (!sessionId) {
+    throw new Error(
+      "Viva Session ID is required."
+    );
+  }
 
-    const cleanEnrollmentNo =
-      String(
-        enrollmentNo || ""
-      ).trim();
+  if (!attemptId) {
+    throw new Error(
+      "Viva attempt ID is required."
+    );
+  }
 
-    if (!cleanEnrollmentNo) {
-      throw new Error(
-        "Enrollment number is required."
-      );
-    }
-
-    return request(
-      `/viva/public/${encodeURIComponent(
+  try {
+    const response = await axios.post(
+      `${API}/${encodeURIComponent(
         sessionId
       )}/complete`,
       {
-        method: "POST",
-
-        body: JSON.stringify({
-          enrollmentNo:
-            cleanEnrollmentNo,
-        }),
+        attemptId,
       }
     );
-  };
 
-// ============================================================
-// OPTIONAL COMPATIBILITY ALIASES
-// ============================================================
-//
-// These aliases prevent import-name mismatch between
-// different Phase 10/11 Student Viva implementations.
-//
-// ============================================================
+    return response.data;
+  } catch (error) {
+    throw new Error(
+      error.response?.data?.message ||
+        error.message ||
+        "Unable to complete Viva."
+    );
+  }
+};
 
-export const startViva =
-  startPublicViva;
+// =====================================================
+// COMPATIBILITY ALIASES
+// =====================================================
 
-export const joinViva =
-  joinPublicViva;
-
-export const getVivaSession =
-  getPublicVivaSession;
-
-export const completeViva =
-  completePublicViva;
+export const startViva = startPublicViva;
+export const joinViva = joinPublicViva;
+export const getVivaSession = getPublicVivaSession;
+export const completeViva = completePublicViva;

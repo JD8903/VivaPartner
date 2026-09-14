@@ -53,6 +53,22 @@ const AssignedClasses = () => {
     navigate("/teacher/start-viva");
   };
 
+  const handleManageStudents = (assignment) => {
+    localStorage.setItem(
+      "selectedClass",
+      JSON.stringify(assignment)
+    );
+    navigate(`/teacher/students?classId=${assignment.class?._id || ""}`);
+  };
+
+  const handleUploadExcel = (assignment) => {
+    localStorage.setItem(
+      "selectedClass",
+      JSON.stringify(assignment)
+    );
+    navigate("/teacher/upload-students");
+  };
+
   if (loading) {
     return (
       <div className="assigned-page">
@@ -135,6 +151,14 @@ const AssignedClasses = () => {
               </div>
 
               <div className="class-details">
+                <span>Enrolled Students</span>
+
+                <strong>
+                  {item.studentCount !== undefined ? item.studentCount : 0} Students
+                </strong>
+              </div>
+
+              <div className="class-details">
                 <span>Capacity</span>
 
                 <strong>
@@ -150,14 +174,49 @@ const AssignedClasses = () => {
                 </span>
               </div>
 
-              <button
-                className="select-class-btn"
-                onClick={() =>
-                  handleSelectClass(item)
-                }
-              >
-                Select Class
-              </button>
+              <div style={{ display: "flex", gap: "8px", marginTop: "15px", flexWrap: "wrap" }}>
+                <button
+                  className="select-class-btn"
+                  style={{ flex: "1 1 100%" }}
+                  onClick={() =>
+                    handleSelectClass(item)
+                  }
+                >
+                  Select & Start Viva
+                </button>
+                <button
+                  style={{
+                    flex: "1 1 calc(50% - 4px)",
+                    padding: "9px 12px",
+                    background: "#f1f5f9",
+                    color: "#334155",
+                    border: "1px solid #cbd5e1",
+                    borderRadius: "8px",
+                    fontSize: "14px",
+                    fontWeight: "600",
+                    cursor: "pointer",
+                  }}
+                  onClick={() => handleManageStudents(item)}
+                >
+                  View Students
+                </button>
+                <button
+                  style={{
+                    flex: "1 1 calc(50% - 4px)",
+                    padding: "9px 12px",
+                    background: "#eff6ff",
+                    color: "#2563eb",
+                    border: "1px solid #bfdbfe",
+                    borderRadius: "8px",
+                    fontSize: "14px",
+                    fontWeight: "600",
+                    cursor: "pointer",
+                  }}
+                  onClick={() => handleUploadExcel(item)}
+                >
+                  Upload Excel
+                </button>
+              </div>
             </div>
           ))}
         </div>

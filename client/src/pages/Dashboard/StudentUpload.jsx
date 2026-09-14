@@ -22,6 +22,8 @@ const StudentUpload = () => {
 
   const [uploadProgress, setUploadProgress] = useState(0);
 
+  const [uploadSummary, setUploadSummary] = useState(null);
+
   useEffect(() => {
     const storedClass = localStorage.getItem("selectedClass");
 
@@ -35,12 +37,14 @@ const StudentUpload = () => {
 
     if (!selectedFile) return;
 
+    const extension = selectedFile.name.split(".").pop().toLowerCase();
+    const isExcelExtension = ["xlsx", "xls"].includes(extension);
     const allowedTypes = [
       "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
       "application/vnd.ms-excel",
     ];
 
-    if (!allowedTypes.includes(selectedFile.type)) {
+    if (!isExcelExtension && !allowedTypes.includes(selectedFile.type)) {
       setError("Please upload a valid Excel (.xlsx or .xls) file.");
       setFile(null);
       setStudents([]);
@@ -49,6 +53,7 @@ const StudentUpload = () => {
 
     setError("");
     setFile(selectedFile);
+    setUploadSummary(null);
 
     const reader = new FileReader();
 
@@ -94,6 +99,7 @@ const StudentUpload = () => {
     setValidationErrors([]);
     setError("");
     setUploadProgress(0);
+    setUploadSummary(null);
   };
 
   const handleContinue = async () => {
@@ -115,31 +121,35 @@ const StudentUpload = () => {
     try {
       setUploading(true);
       setUploadProgress(0);
+      setError("");
 
       const formData = new FormData();
-
-      // IMPORTANT
       formData.append("excel", file);
 
-      formData.append(
-        "classId",
-        selectedClass?.class?._id || ""
-      );
+      const targetClassId =
+        selectedClass?.class?._id ||
+        selectedClass?.classId ||
+        selectedClass?._id ||
+        "";
 
-      formData.append(
-        "teacher",
-        selectedClass?.teacher?._id || ""
-      );
+      formData.append("classId", targetClassId);
+
+      const teacherId =
+        selectedClass?.teacher?._id ||
+        selectedClass?.teacher ||
+        "";
+
+      formData.append("teacher", teacherId);
 
       const response = await uploadStudents(
         formData,
         (progressEvent) => {
-          const percent = Math.round(
-            (progressEvent.loaded * 100) /
-              progressEvent.total
-          );
-
-          setUploadProgress(percent);
+          if (progressEvent.total) {
+            const percent = Math.round(
+              (progressEvent.loaded * 100) / progressEvent.total
+            );
+            setUploadProgress(percent);
+          }
         }
       );
 
@@ -147,15 +157,17 @@ const StudentUpload = () => {
         throw new Error(response.data.message);
       }
 
-      localStorage.removeItem("students");
+      setUploadSummary(response.data.summary || { imported: students.length });
 
-      navigate("/teacher/student-pairing");
+      // Clean cached items
+      localStorage.removeItem("students");
 
     } catch (err) {
       console.error(err);
 
       setError(
         err.response?.data?.message ||
+          err.message ||
           "Failed to upload students."
       );
     } finally {
@@ -303,27 +315,103 @@ const StudentUpload = () => {
           </div>
         )}
 
+        {uploadSummary && (
+          <div
+            style={{
+              marginTop: "20px",
+              padding: "16px",
+              background: "#dcfce7",
+              color: "#166534",
+              borderRadius: "8px",
+              border: "1px solid #86efac",
+            }}
+          >
+            <h3 style={{ margin: "0 0 8px 0" }}>✅ Student Upload Completed</h3>
+            <p style={{ margin: "4px 0" }}>
+              Total Rows Processed: <strong>{uploadSummary.totalRows || students.length}</strong>
+            </p>
+            {uploadSummary.imported !== undefined && (
+              <p style={{ margin: "4px 0" }}>
+                New Students Added: <strong>{uploadSummary.imported}</strong>
+              </p>
+            )}
+            {uploadSummary.updated !== undefined && (
+              <p style={{ margin: "4px 0" }}>
+                Existing Students Updated: <strong>{uploadSummary.updated}</strong>
+              </p>
+            )}
+            {uploadSummary.duplicateInExcel > 0 && (
+              <p style={{ margin: "4px 0", color: "#b45309" }}>
+                Duplicate Rows in Sheet: <strong>{uploadSummary.duplicateInExcel}</strong>
+              </p>
+            )}
+            <div style={{ display: "flex", gap: "10px", marginTop: "15px" }}>
+              <button
+                type="button"
+                style={{
+                  padding: "10px 18px",
+                  background: "#166534",
+                  color: "#fff",
+                  border: "none",
+                  borderRadius: "6px",
+                  cursor: "pointer",
+                  fontWeight: "600",
+                }}
+                onClick={() =>
+                  navigate(
+                    `/teacher/students?classId=${
+                      selectedClass?.class?._id ||
+                      selectedClass?.classId ||
+                      selectedClass?._id ||
+                      ""
+                    }`
+                  )
+                }
+              >
+                View Enrolled Students →
+              </button>
+              <button
+                type="button"
+                style={{
+                  padding: "10px 18px",
+                  background: "#2563eb",
+                  color: "#fff",
+                  border: "none",
+                  borderRadius: "6px",
+                  cursor: "pointer",
+                  fontWeight: "600",
+                }}
+                onClick={() => navigate("/teacher/viva-setup")}
+              >
+                Proceed to Viva Setup →
+              </button>
+            </div>
+          </div>
+        )}
+
         <div className="upload-actions">
           <button
             className="back-btn"
-            onClick={() => navigate("/teacher/viva-setup")}
+            onClick={() => navigate("/teacher/assigned-classes")}
             disabled={uploading}
           >
-            ← Back
+            ← Back to Classes
           </button>
 
-          <button
-            className="continue-btn"
-            onClick={handleContinue}
-            disabled={
-              uploading ||
-              !file ||
-              students.length === 0 ||
-              validationErrors.length > 0
-            }
-          >
-            {uploading ? "Uploading..." : "Continue →"}
-          </button>
+          {!uploadSummary && (
+            <button
+              className="continue-btn"
+              onClick={handleContinue}
+              disabled={
+                uploading ||
+                !file ||
+                students.length === 0 ||
+                validationErrors.length > 0
+              }
+            >
+              {uploading ? "Uploading..." : "Upload Excel →"}
+            </button>
+          )}
         </div>
       </div>
     </div>

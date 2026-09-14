@@ -4,6 +4,7 @@ const vivaConfigurationSchema = new mongoose.Schema(
   {
     teacher: {
       type: mongoose.Schema.Types.ObjectId,
+      ref: "User",
       required: false,
     },
 
@@ -26,6 +27,19 @@ const vivaConfigurationSchema = new mongoose.Schema(
       },
     ],
 
+    selectedStudents: [
+      {
+        type: mongoose.Schema.Types.ObjectId,
+        ref: "Student",
+      },
+    ],
+
+    studentSelectionMode: {
+      type: String,
+      enum: ["all", "selected"],
+      default: "all",
+    },
+
     studentsPerViva: {
       type: Number,
       enum: [1, 2, 3, 4],
@@ -34,7 +48,8 @@ const vivaConfigurationSchema = new mongoose.Schema(
 
     numberOfQuestions: {
       type: Number,
-      enum: [5, 10, 15, 20],
+      min: 1,
+      max: 50,
       default: 5,
     },
 

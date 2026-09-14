@@ -1,17 +1,31 @@
 import { useEffect, useState } from "react";
+import { useSearchParams, useNavigate } from "react-router-dom";
 import {
   getStudents,
   updateStudent,
+  deleteStudent,
 } from "../../../services/studentApi";
+import { getAssignedClasses } from "../../../services/teacherApi";
 
 const StudentManagement = () => {
+  const [searchParams] = useSearchParams();
+  const navigate = useNavigate();
+
   const [students, setStudents] = useState([]);
   const [loading, setLoading] = useState(true);
 
+  // Assigned classes from server
+  const [assignedClasses, setAssignedClasses] = useState([]);
+
   // Search & Filters
   const [search, setSearch] = useState("");
-  const [classFilter, setClassFilter] = useState("");
+  const [classFilter, setClassFilter] = useState(
+    searchParams.get("classId") || ""
+  );
   const [departmentFilter, setDepartmentFilter] = useState("");
+
+  // Student Selection state (Phase 6.6)
+  const [selectedStudentIds, setSelectedStudentIds] = useState(new Set());
 
   // Pagination
   const [currentPage, setCurrentPage] = useState(1);
@@ -36,6 +50,21 @@ const StudentManagement = () => {
     marks: 0,
   });
 
+  // Load teacher assigned classes once
+  useEffect(() => {
+    const loadClasses = async () => {
+      try {
+        const data = await getAssignedClasses();
+        if (data && data.assignments) {
+          setAssignedClasses(data.assignments);
+        }
+      } catch (err) {
+        console.error("Failed to load assigned classes:", err);
+      }
+    };
+    loadClasses();
+  }, []);
+
   useEffect(() => {
     fetchStudents();
   }, [
@@ -58,8 +87,8 @@ const StudentManagement = () => {
         rowsPerPage
       );
 
-      setStudents(res.data.students);
-      setTotalPages(res.data.pagination.totalPages);
+      setStudents(res.data.students || []);
+      setTotalPages(res.data.pagination?.totalPages || 1);
     } catch (error) {
       console.error(error);
     } finally {
@@ -72,6 +101,49 @@ const StudentManagement = () => {
     setClassFilter("");
     setDepartmentFilter("");
     setCurrentPage(1);
+  };
+
+  // Student Selection handlers (Phase 6.6)
+  const toggleSelectStudent = (id) => {
+    setSelectedStudentIds((prev) => {
+      const next = new Set(prev);
+      if (next.has(id)) {
+        next.delete(id);
+      } else {
+        next.add(id);
+      }
+      return next;
+    });
+  };
+
+  const toggleSelectAll = () => {
+    if (selectedStudentIds.size === students.length && students.length > 0) {
+      setSelectedStudentIds(new Set());
+    } else {
+      setSelectedStudentIds(new Set(students.map((s) => s._id)));
+    }
+  };
+
+  const handleTargetForViva = () => {
+    const selected = students.filter((s) => selectedStudentIds.has(s._id));
+    if (selected.length === 0) {
+      alert("Please select at least one student.");
+      return;
+    }
+
+    localStorage.setItem("selectedStudents", JSON.stringify(selected));
+
+    // If there is an active class assignment matching classFilter, save it as selectedClass
+    if (classFilter) {
+      const matching = assignedClasses.find(
+        (a) => a.class?._id === classFilter || a.class?.code === classFilter
+      );
+      if (matching) {
+        localStorage.setItem("selectedClass", JSON.stringify(matching));
+      }
+    }
+
+    navigate("/teacher/viva-setup");
   };
 
   // Open Edit Modal
@@ -123,8 +195,6 @@ const StudentManagement = () => {
         formData
       );
 
-      alert(res.data.message);
-
       setShowEditModal(false);
 
       setSuccessMessage("Student updated successfully.");
@@ -143,6 +213,22 @@ const StudentManagement = () => {
       );
     }
   };
+
+  const handleDelete = async (studentId) => {
+    if (!window.confirm("Are you sure you want to delete this student?")) {
+      return;
+    }
+
+    try {
+      await deleteStudent(studentId);
+      setSuccessMessage("Student deleted successfully.");
+      fetchStudents();
+      setTimeout(() => setSuccessMessage(""), 3000);
+    } catch (err) {
+      console.error(err);
+      alert(err.response?.data?.message || "Failed to delete student.");
+    }
+  };
   return (
   <div style={{ padding: "30px" }}>
     <h1>Student Management</h1>
@@ -159,6 +245,92 @@ const StudentManagement = () => {
         }}
       >
         {successMessage}
+      </div>
+    )}
+
+    {/* Header Actions */}
+    <div
+      style={{
+        display: "flex",
+        justifyContent: "space-between",
+        alignItems: "center",
+        marginBottom: "20px",
+        flexWrap: "wrap",
+        gap: "12px",
+      }}
+    >
+      <div>
+        <p style={{ color: "#64748b", margin: 0 }}>
+          Manage students enrolled in your assigned classes or upload new students via Excel.
+        </p>
+      </div>
+
+      <div style={{ display: "flex", gap: "10px" }}>
+        <button
+          onClick={() => navigate("/teacher/upload-students")}
+          style={{
+            padding: "10px 18px",
+            background: "#2563eb",
+            color: "#fff",
+            border: "none",
+            borderRadius: "8px",
+            fontWeight: "600",
+            cursor: "pointer",
+          }}
+        >
+          + Upload Students Excel
+        </button>
+      </div>
+    </div>
+
+    {/* Selection Action Toolbar (Phase 6.6) */}
+    {selectedStudentIds.size > 0 && (
+      <div
+        style={{
+          background: "#eff6ff",
+          border: "1px solid #bfdbfe",
+          borderRadius: "8px",
+          padding: "12px 16px",
+          marginBottom: "20px",
+          display: "flex",
+          alignItems: "center",
+          justifyContent: "space-between",
+          flexWrap: "wrap",
+          gap: "10px",
+        }}
+      >
+        <div style={{ color: "#1e40af", fontWeight: "600" }}>
+          ☑ {selectedStudentIds.size} student(s) selected
+        </div>
+        <div style={{ display: "flex", gap: "10px" }}>
+          <button
+            onClick={() => setSelectedStudentIds(new Set())}
+            style={{
+              padding: "8px 14px",
+              background: "#fff",
+              color: "#475569",
+              border: "1px solid #cbd5e1",
+              borderRadius: "6px",
+              cursor: "pointer",
+            }}
+          >
+            Clear Selection
+          </button>
+          <button
+            onClick={handleTargetForViva}
+            style={{
+              padding: "8px 16px",
+              background: "#16a34a",
+              color: "#fff",
+              border: "none",
+              borderRadius: "6px",
+              fontWeight: "600",
+              cursor: "pointer",
+            }}
+          >
+            Setup Viva for Selected ({selectedStudentIds.size}) →
+          </button>
+        </div>
       </div>
     )}
 
@@ -211,6 +383,7 @@ const StudentManagement = () => {
         gap: "15px",
         marginBottom: "20px",
         flexWrap: "wrap",
+        alignItems: "center",
       }}
     >
       <select
@@ -219,26 +392,14 @@ const StudentManagement = () => {
           setClassFilter(e.target.value);
           setCurrentPage(1);
         }}
+        style={{ padding: "10px", borderRadius: "8px", border: "1px solid #cbd5e1" }}
       >
-        <option value="">All Classes</option>
-        <option value="CE-6A">CE-6A</option>
-        <option value="CE-6B">CE-6B</option>
-        <option value="IT-6A">IT-6A</option>
-        <option value="IT-6B">IT-6B</option>
-      </select>
-
-      <select
-        value={departmentFilter}
-        onChange={(e) => {
-          setDepartmentFilter(e.target.value);
-          setCurrentPage(1);
-        }}
-      >
-        <option value="">All Departments</option>
-        <option value="CE">Computer Engineering</option>
-        <option value="IT">Information Technology</option>
-        <option value="EC">Electronics</option>
-        <option value="ME">Mechanical</option>
+        <option value="">All Assigned Classes</option>
+        {assignedClasses.map((item) => (
+          <option key={item._id} value={item.class?._id}>
+            {item.class?.name} — {item.subject?.name} (Sem {item.class?.semester})
+          </option>
+        ))}
       </select>
 
       <button
@@ -264,6 +425,7 @@ const StudentManagement = () => {
             setRowsPerPage(Number(e.target.value));
             setCurrentPage(1);
           }}
+          style={{ padding: "8px", borderRadius: "6px", border: "1px solid #cbd5e1" }}
         >
           <option value={5}>5</option>
           <option value={10}>10</option>
@@ -290,7 +452,22 @@ const StudentManagement = () => {
           padding: "40px",
         }}
       >
-        No students found.
+        <p style={{ fontSize: "18px", color: "#64748b" }}>No students found for this filter.</p>
+        <button
+          onClick={() => navigate("/teacher/upload-students")}
+          style={{
+            marginTop: "10px",
+            padding: "10px 20px",
+            background: "#2563eb",
+            color: "#fff",
+            border: "none",
+            borderRadius: "8px",
+            cursor: "pointer",
+            fontWeight: "600",
+          }}
+        >
+          Upload Students Excel Now
+        </button>
       </div>
     ) : (
       <>
@@ -301,6 +478,7 @@ const StudentManagement = () => {
           cellSpacing="0"
           style={{
             borderCollapse: "collapse",
+            borderColor: "#e2e8f0",
           }}
         >
           <thead
@@ -310,6 +488,16 @@ const StudentManagement = () => {
             }}
           >
             <tr>
+              <th style={{ width: "40px", textAlign: "center" }}>
+                <input
+                  type="checkbox"
+                  checked={
+                    selectedStudentIds.size === students.length &&
+                    students.length > 0
+                  }
+                  onChange={toggleSelectAll}
+                />
+              </th>
               <th>#</th>
               <th>Enrollment</th>
               <th>Name</th>
@@ -324,33 +512,84 @@ const StudentManagement = () => {
 
           <tbody>
             {students.map((student, index) => (
-              <tr key={student._id}>
+              <tr
+                key={student._id}
+                style={{
+                  background: selectedStudentIds.has(student._id)
+                    ? "#eff6ff"
+                    : "#fff",
+                }}
+              >
+                <td style={{ textAlign: "center" }}>
+                  <input
+                    type="checkbox"
+                    checked={selectedStudentIds.has(student._id)}
+                    onChange={() => toggleSelectStudent(student._id)}
+                  />
+                </td>
+
                 <td>
                   {(currentPage - 1) * rowsPerPage + index + 1}
                 </td>
 
-                <td>{student.enrollment}</td>
+                <td><strong>{student.enrollment}</strong></td>
                 <td>{student.name}</td>
                 <td>{student.department}</td>
                 <td>{student.semester}</td>
                 <td>{student.classId}</td>
-                <td>{student.vivaStatus}</td>
-                <td>{student.marks}</td>
-
                 <td>
-                  <button
-                    onClick={() => handleEdit(student)}
+                  <span
                     style={{
-                      background: "#f59e0b",
-                      color: "#fff",
-                      border: "none",
-                      padding: "8px 14px",
-                      borderRadius: "6px",
-                      cursor: "pointer",
+                      padding: "4px 8px",
+                      borderRadius: "12px",
+                      fontSize: "12px",
+                      fontWeight: "600",
+                      background:
+                        student.vivaStatus === "Completed"
+                          ? "#dcfce7"
+                          : "#fef3c7",
+                      color:
+                        student.vivaStatus === "Completed"
+                          ? "#166534"
+                          : "#b45309",
                     }}
                   >
-                    Edit
-                  </button>
+                    {student.vivaStatus || "Pending"}
+                  </span>
+                </td>
+                <td>{student.marks || 0}</td>
+
+                <td>
+                  <div style={{ display: "flex", gap: "6px" }}>
+                    <button
+                      onClick={() => handleEdit(student)}
+                      style={{
+                        background: "#f59e0b",
+                        color: "#fff",
+                        border: "none",
+                        padding: "6px 12px",
+                        borderRadius: "6px",
+                        cursor: "pointer",
+                        fontSize: "13px",
+                      }}
+                    >
+                      Edit
+                    </button>
+                    <button
+                      onClick={() => handleDelete(student._id)}
+                      style={{
+                        background: "#ef4444",
+                        color: "#fff",
+                        border: "none",
+                        padding: "6px 12px",
+                        borderRadius: "6px",
+                        cursor: "pointer",
+                        fontSize: "13px",
+                      }}
+                    >
+                      Delete
+                    </button>
+                  </div>
                 </td>
               </tr>
             ))}

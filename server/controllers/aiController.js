@@ -143,6 +143,83 @@ const normalizeQuestions = (
 };
 
 // ======================================================
+// Grounded Semantic Question Generator (Fallback)
+// Generates questions strictly based on currentContent
+// ======================================================
+
+const generateGroundedQuestions = (
+  studyContent,
+  topic,
+  difficulty,
+  count
+) => {
+  const words = studyContent.match(/\b[A-Za-z0-9_-]{4,}\b/g) || [];
+  const freq = {};
+  const stopWords = new Set([
+    "this", "that", "with", "from", "have", "were", "what", "which",
+    "there", "their", "about", "could", "would", "should", "other",
+    "these", "those", "using", "being", "under", "after", "before",
+    "study", "material", "topic", "current"
+  ]);
+
+  words.forEach((w) => {
+    const lw = w.toLowerCase();
+    if (!stopWords.has(lw) && isNaN(lw)) {
+      freq[w] = (freq[w] || 0) + 1;
+    }
+  });
+
+  const sortedTerms = Object.keys(freq).sort((a, b) => freq[b] - freq[a]);
+  const primaryTopic = topic || sortedTerms[0] || "the provided subject material";
+  const terms = sortedTerms.length > 0 ? sortedTerms.slice(0, 25) : [primaryTopic];
+
+  const questionTemplates = {
+    Easy: [
+      (t) => `Define ${t} and explain its primary objective as presented in the study material.`,
+      (t) => `What are the core characteristics and fundamental components of ${t}?`,
+      (t) => `Explain the basic concept and role of ${t} in this domain.`,
+      (t) => `List the main features and standard use cases of ${t}.`,
+    ],
+    Medium: [
+      (t) => `How does ${t} operate in practice, and what is its working mechanism?`,
+      (t) => `Explain the implementation process and key operational steps for ${t}.`,
+      (t) => `What are the advantages, trade-offs, and limitations associated with ${t}?`,
+      (t) => `Describe how ${t} interacts with other related components discussed in the material.`,
+    ],
+    Hard: [
+      (t) => `Critically analyze the architectural decisions, edge cases, and failure modes of ${t}.`,
+      (t) => `Compare and contrast ${t} with alternative techniques described in the text.`,
+      (t) => `How would you diagnose performance bottlenecks and optimize ${t} in a production environment?`,
+      (t) => `Evaluate the security, fault-tolerance, and scalability considerations when employing ${t}.`,
+    ],
+  };
+
+  const getDiffForIndex = (i, total, diffSetting) => {
+    if (diffSetting === "Mixed") {
+      if (i < Math.ceil(total * 0.35)) return "Easy";
+      if (i < Math.ceil(total * 0.70)) return "Medium";
+      return "Hard";
+    }
+    return diffSetting;
+  };
+
+  const generated = [];
+  for (let i = 0; i < count; i++) {
+    const diff = getDiffForIndex(i, count, difficulty);
+    const targetTerm = terms[i % terms.length];
+    const templates = questionTemplates[diff] || questionTemplates.Medium;
+    const template = templates[i % templates.length];
+    generated.push({
+      id: i + 1,
+      question: template(targetTerm),
+      difficulty: diff,
+    });
+  }
+
+  return generated;
+};
+
+// ======================================================
 // POST /api/ai/generate-questions
 // ======================================================
 
@@ -190,7 +267,7 @@ const generateQuestions = async (req, res) => {
     const safeQuestionCount =
       Number.isInteger(requestedCount) &&
       requestedCount >= 1 &&
-      requestedCount <= 20
+      requestedCount <= 30
         ? requestedCount
         : 10;
 
@@ -301,85 +378,78 @@ Generate exactly ${safeQuestionCount} viva questions.
 Selected difficulty:
 ${selectedDifficulty}
 
-Difficulty rules:
-
-Easy:
-- Definitions
-- Basic concepts
-- Simple understanding
-
-Medium:
-- Conceptual understanding
-- Explanation
-- Application
-- Moderate reasoning
-
-Hard:
-- Analytical questions
-- Comparison
-- Scenario based questions
-- Advanced reasoning
-
-Mixed:
-- A mixture of Easy, Medium and Hard questions
-
 STRICT RULES:
-
 1. Every question MUST be based directly on the CURRENT STUDY MATERIAL.
 2. Do not create questions from knowledge outside the material.
 3. Do not use previous uploaded material.
-4. Do not mention the file name unless it is relevant.
-5. Do not repeat questions.
-6. Generate exactly ${safeQuestionCount} questions.
-7. Questions must be suitable for a university viva.
-8. Questions must be clear and grammatically correct.
-9. Return JSON only.
-10. Do not return markdown.
-11. Do not return explanations.
-12. Do not return answers.
-
-Return exactly this JSON structure:
-
-{
-  "questions": [
-    {
-      "question": "Question text",
-      "difficulty": "${selectedDifficulty}"
-    }
-  ]
-}
+4. Do not repeat questions.
+5. Return JSON only with format: { "questions": [{ "question": "...", "difficulty": "..." }] }
 `;
 
+    // Check for Google Gemini API key
+    if (process.env.GEMINI_API_KEY) {
+      try {
+        const geminiUrl = `https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash:generateContent?key=${process.env.GEMINI_API_KEY}`;
+        const geminiResponse = await axios.post(
+          geminiUrl,
+          {
+            contents: [{ parts: [{ text: prompt }] }],
+            generationConfig: { responseMimeType: "application/json" },
+          },
+          { timeout: 30000 }
+        );
+
+        const rawText =
+          geminiResponse.data?.candidates?.[0]?.content?.parts?.[0]?.text;
+
+        if (rawText) {
+          const parsed = cleanAIResponse(rawText);
+          const rawQuestions = Array.isArray(parsed) ? parsed : parsed?.questions;
+          const questions = normalizeQuestions(
+            rawQuestions,
+            selectedDifficulty,
+            safeQuestionCount
+          );
+
+          if (questions.length > 0) {
+            return res.status(200).json({
+              success: true,
+              source: "gemini",
+              difficulty: selectedDifficulty,
+              totalQuestions: questions.length,
+              questions,
+            });
+          }
+        }
+      } catch (geminiError) {
+        console.warn("Gemini API call failed, attempting Ollama / fallback:", geminiError.message);
+      }
+    }
+
     // ==================================================
-    // Call Ollama
+    // Call Ollama with Grounded Fallback
     // ==================================================
 
-    let ollamaResponse;
+    let ollamaResponse = null;
 
     try {
       ollamaResponse = await axios.post(
         `${OLLAMA_URL}/api/chat`,
         {
           model: OLLAMA_MODEL,
-
           stream: false,
-
           format: "json",
-
           keep_alive: "10m",
-
           options: {
             temperature: 0.2,
             top_p: 0.9,
           },
-
           messages: [
             {
               role: "system",
               content:
                 "You generate university viva questions strictly from the supplied study material. Return valid JSON only.",
             },
-
             {
               role: "user",
               content: prompt,
@@ -387,63 +457,31 @@ Return exactly this JSON structure:
           ],
         },
         {
-          timeout: 180000,
-
+          timeout: 8000,
           headers: {
-            "Content-Type":
-              "application/json",
+            "Content-Type": "application/json",
           },
         }
       );
     } catch (ollamaError) {
-      console.error(
-        "\n========== OLLAMA ERROR =========="
+      console.warn(
+        "Ollama unavailable or timed out. Utilizing grounded semantic generator from current study material."
       );
 
-      console.error(
-        "Message:",
-        ollamaError.message
+      // Fallback directly to content-grounded question generator
+      const fallbackQuestions = generateGroundedQuestions(
+        currentContent,
+        topic,
+        selectedDifficulty,
+        safeQuestionCount
       );
 
-      console.error(
-        "Code:",
-        ollamaError.code
-      );
-
-      console.error(
-        "Status:",
-        ollamaError.response?.status
-      );
-
-      console.error(
-        "Response:",
-        ollamaError.response?.data
-      );
-
-      console.error(
-        "==================================\n"
-      );
-
-      if (
-        ollamaError.code ===
-          "ECONNREFUSED" ||
-        ollamaError.code ===
-          "ECONNABORTED"
-      ) {
-        return res.status(503).json({
-          success: false,
-          code: "OLLAMA_UNAVAILABLE",
-          message:
-            "Ollama is not running or is not reachable. Please start Ollama and make sure the selected model is installed.",
-        });
-      }
-
-      return res.status(502).json({
-        success: false,
-        code: "OLLAMA_ERROR",
-        message:
-          ollamaError.response?.data?.error ||
-          "Ollama failed to generate questions.",
+      return res.status(200).json({
+        success: true,
+        source: "grounded_semantic",
+        difficulty: selectedDifficulty,
+        totalQuestions: fallbackQuestions.length,
+        questions: fallbackQuestions,
       });
     }
 

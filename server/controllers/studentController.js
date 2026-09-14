@@ -1,7 +1,22 @@
 const Student = require("../models/Student");
 const Class = require("../models/Class");
+const Assignment = require("../models/Assignment");
+const mongoose = require("mongoose");
 const { parseExcel } = require("../services/excelService");
 
+// Helper to find a matching column header by regex list
+const findColumnKey = (row, regexList) => {
+  const keys = Object.keys(row);
+  for (const regex of regexList) {
+    const matched = keys.find((key) => regex.test(key.trim()));
+    if (matched) return matched;
+  }
+  return null;
+};
+
+// =====================================================
+// UPLOAD STUDENTS VIA EXCEL
+// =====================================================
 const uploadStudents = async (req, res) => {
   try {
     if (!req.file) {
@@ -13,150 +28,195 @@ const uploadStudents = async (req, res) => {
 
     const { classId, teacher } = req.body;
 
-    let students = parseExcel(req.file.buffer);
+    let rows = parseExcel(req.file.buffer);
 
-    console.log("Students raw count:", students.length);
-
-    if (!students || students.length === 0) {
+    if (!rows || rows.length === 0) {
       return res.status(400).json({
         success: false,
         message: "Excel file is empty.",
       });
     }
 
-    // Remove empty rows
-    students = students.filter((row) =>
+    // Filter out rows that are entirely empty
+    rows = rows.filter((row) =>
       Object.values(row).some(
-        (value) => value !== "" && value !== null && value !== undefined
+        (val) => val !== "" && val !== null && val !== undefined
       )
     );
 
-    if (students.length === 0) {
+    if (rows.length === 0) {
       return res.status(400).json({
         success: false,
-        message: "Excel file contains no non-empty rows.",
+        message: "Excel file contains no data rows.",
       });
     }
 
-    // Helper to find a key matching some names
-    const getRowValue = (row, names) => {
-      const keys = Object.keys(row);
-      for (const name of names) {
-        const key = keys.find(k => k.toLowerCase().replace(/[^a-z0-9]/g, "").includes(name.toLowerCase().replace(/[^a-z0-9]/g, "")));
-        if (key) return row[key];
+    // Detect column headers flexibly
+    const firstRow = rows[0];
+
+    const enrollmentKey = findColumnKey(firstRow, [
+      /^enrollment(\s*(no|number|num))?$/i,
+      /^roll(\s*(no|number|num))?$/i,
+      /^reg(istration)?(\s*(no|number|num))?$/i,
+      /enrollment/i,
+      /roll/i,
+    ]);
+
+    const nameKey = findColumnKey(firstRow, [
+      /^student(\s*name)?$/i,
+      /^name$/i,
+      /^full(\s*name)?$/i,
+      /name/i,
+    ]);
+
+    if (!enrollmentKey || !nameKey) {
+      return res.status(400).json({
+        success: false,
+        message:
+          "Required columns missing. Please ensure your Excel sheet has 'Enrollment Number' (or 'Roll No') and 'Student Name' columns.",
+      });
+    }
+
+    const deptKey = findColumnKey(firstRow, [
+      /^department$/i,
+      /^dept$/i,
+      /department/i,
+    ]);
+
+    const semKey = findColumnKey(firstRow, [
+      /^semester$/i,
+      /^sem$/i,
+      /semester/i,
+    ]);
+
+    const classKey = findColumnKey(firstRow, [
+      /^class$/i,
+      /^class(\s*name|code)?$/i,
+      /class/i,
+    ]);
+
+    const marksKey = findColumnKey(firstRow, [
+      /^marks$/i,
+      /^score$/i,
+      /marks/i,
+    ]);
+
+    // Lookup class metadata if classId is provided
+    let defaultDepartment = "";
+    let defaultSemester = 1;
+    let resolvedClassId = classId || "";
+
+    if (classId && mongoose.Types.ObjectId.isValid(classId)) {
+      const cls = await Class.findById(classId).populate("department");
+      if (cls) {
+        resolvedClassId = cls._id.toString();
+        defaultDepartment = cls.department?.name || cls.department?.code || "";
+        defaultSemester = cls.semester || 1;
       }
-      return null;
-    };
-
-    // If Class information is missing in Excel, we look up from the class database
-    let defaultClassDoc = null;
-    if (classId) {
-      defaultClassDoc = await Class.findById(classId).populate("department");
     }
 
-    const firstRow = students[0];
-    const enrollmentKeyUsed = Object.keys(firstRow).find(k => k.toLowerCase().includes("enrollment") || k.toLowerCase() === "roll no" || k.toLowerCase() === "rollnumber");
-    const nameKeyUsed = Object.keys(firstRow).find(k => k.toLowerCase().includes("name"));
-
-    if (!enrollmentKeyUsed || !nameKeyUsed) {
-      return res.status(400).json({
-        success: false,
-        message: "Missing essential columns. Excel must contain 'Enrollment No' and 'Student Name' columns.",
-      });
-    }
-
-    // Duplicate check inside Excel
-    const seen = new Set();
+    // Process rows
+    const seenInExcel = new Set();
     const duplicateInExcel = [];
-
-    students.forEach((row) => {
-      const val = row[enrollmentKeyUsed];
-      const enrollment = val ? String(val).trim() : "";
-      if (!enrollment) return;
-
-      if (seen.has(enrollment)) {
-        duplicateInExcel.push(enrollment);
-      } else {
-        seen.add(enrollment);
-      }
-    });
-
     const importedStudents = [];
-    const skippedStudents = [];
+    const updatedStudents = [];
+    const invalidRows = [];
 
-    for (const row of students) {
-      const val = row[enrollmentKeyUsed];
-      const enrollment = val ? String(val).trim() : "";
-      if (!enrollment) continue;
+    const effectiveTeacher =
+      teacher || (req.user?.role === "teacher" ? req.user._id : null);
 
-      // Skip duplicate rows inside Excel
-      if (duplicateInExcel.includes(enrollment)) {
-        if (skippedStudents.includes(enrollment)) {
-          continue;
-        }
-        skippedStudents.push(enrollment);
+    for (let i = 0; i < rows.length; i++) {
+      const row = rows[i];
+      const rawEnrollment = row[enrollmentKey];
+      const rawName = row[nameKey];
+
+      const enrollment = rawEnrollment !== undefined && rawEnrollment !== null
+        ? String(rawEnrollment).trim()
+        : "";
+      const name = rawName !== undefined && rawName !== null
+        ? String(rawName).trim()
+        : "";
+
+      if (!enrollment || !name) {
+        invalidRows.push({
+          rowNumber: i + 2,
+          reason: !enrollment ? "Missing enrollment number" : "Missing student name",
+        });
         continue;
       }
 
-      const exists = await Student.findOne({ enrollment });
-
-      if (exists) {
-        skippedStudents.push(enrollment);
+      // Check duplicate within Excel
+      if (seenInExcel.has(enrollment)) {
+        duplicateInExcel.push(enrollment);
         continue;
       }
+      seenInExcel.add(enrollment);
 
-      // Extract details
-      const studentName = String(row[nameKeyUsed] || "").trim();
-      
-      // Determine department, semester, class values
-      let deptVal = getRowValue(row, ["department", "dept"]);
-      let semVal = getRowValue(row, ["semester", "sem"]);
-      let classVal = getRowValue(row, ["class", "classid"]);
+      // Extract row data with fallbacks
+      const department =
+        (deptKey && String(row[deptKey]).trim()) ||
+        defaultDepartment ||
+        "General";
 
-      if (!deptVal && defaultClassDoc) {
-        deptVal = defaultClassDoc.department ? defaultClassDoc.department.name : "";
+      const semester =
+        (semKey && Number(row[semKey])) ||
+        defaultSemester ||
+        1;
+
+      const rowClassId =
+        resolvedClassId ||
+        (classKey && String(row[classKey]).trim()) ||
+        "General";
+
+      const marks = (marksKey && Number(row[marksKey])) || 0;
+
+      // Check if student already exists in DB
+      let existing = await Student.findOne({ enrollment });
+
+      if (existing) {
+        // Update existing record with current class and info
+        existing.name = name;
+        if (department) existing.department = department;
+        if (semester) existing.semester = semester;
+        if (rowClassId) existing.classId = rowClassId;
+        if (effectiveTeacher) existing.teacher = effectiveTeacher;
+        if (marksKey && !isNaN(marks)) existing.marks = marks;
+
+        await existing.save();
+        updatedStudents.push(existing);
+      } else {
+        // Create new student
+        const newStudent = await Student.create({
+          enrollment,
+          name,
+          department,
+          semester,
+          classId: rowClassId,
+          teacher: effectiveTeacher || null,
+          vivaStatus: "Pending",
+          marks,
+        });
+        importedStudents.push(newStudent);
       }
-      if (!semVal && defaultClassDoc) {
-        semVal = defaultClassDoc.semester;
-      }
-      if (!classVal && defaultClassDoc) {
-        classVal = defaultClassDoc.name;
-      }
-
-      const studentData = {
-        enrollment,
-        name: studentName,
-        department: String(deptVal || "General").trim(),
-        semester: Number(semVal || 1),
-        classId: classId || String(classVal || "").trim(),
-        vivaStatus: "Pending",
-        marks: 0,
-      };
-
-      // Only save teacher if it exists
-      if (teacher && teacher !== "") {
-        studentData.teacher = teacher;
-      }
-
-      const student = await Student.create(studentData);
-      importedStudents.push(student);
     }
 
     return res.status(201).json({
       success: true,
-      message: "Students imported successfully.",
+      message: `Successfully processed ${importedStudents.length + updatedStudents.length} students (${importedStudents.length} added, ${updatedStudents.length} updated).`,
       summary: {
-        totalRows: students.length,
+        totalRows: rows.length,
         imported: importedStudents.length,
-        skipped: skippedStudents.length,
+        updated: updatedStudents.length,
         duplicateInExcel: duplicateInExcel.length,
+        invalidRows: invalidRows.length,
       },
       duplicateInExcel,
-      skippedEnrollments: skippedStudents,
-      students: importedStudents,
+      invalidRows,
+      students: [...importedStudents, ...updatedStudents],
     });
   } catch (error) {
     console.error("Student Import Error:", error);
+
     return res.status(500).json({
       success: false,
       message: "Failed to import students.",
@@ -165,6 +225,9 @@ const uploadStudents = async (req, res) => {
   }
 };
 
+// =====================================================
+// GET STUDENTS (SEARCH + FILTER + PAGINATION)
+// =====================================================
 const getStudents = async (req, res) => {
   try {
     const {
@@ -176,6 +239,32 @@ const getStudents = async (req, res) => {
     } = req.query;
 
     let filter = {};
+
+    // Teacher authorization: restrict to teacher's assigned classes if teacher role
+    if (req.user && req.user.role === "teacher") {
+      const teacherAssignments = await Assignment.find({
+        teacher: req.user._id,
+        status: "Active",
+      }).populate("class");
+
+      const allowedClassIds = teacherAssignments
+        .map((a) => a.class?._id?.toString())
+        .filter(Boolean);
+
+      const allowedClassCodes = teacherAssignments
+        .map((a) => a.class?.code)
+        .filter(Boolean);
+
+      const allAllowed = [...new Set([...allowedClassIds, ...allowedClassCodes])];
+
+      if (classId && classId.trim() !== "") {
+        filter.classId = classId;
+      } else {
+        filter.classId = { $in: allAllowed };
+      }
+    } else if (classId && classId.trim() !== "") {
+      filter.classId = classId;
+    }
 
     if (search && search.trim() !== "") {
       filter.$or = [
@@ -194,10 +283,6 @@ const getStudents = async (req, res) => {
       ];
     }
 
-    if (classId && classId.trim() !== "") {
-      filter.classId = classId;
-    }
-
     if (department && department.trim() !== "") {
       filter.department = department;
     }
@@ -208,7 +293,7 @@ const getStudents = async (req, res) => {
     const totalStudents = await Student.countDocuments(filter);
 
     const students = await Student.find(filter)
-      .sort({ createdAt: -1 })
+      .sort({ enrollment: 1, createdAt: -1 })
       .skip((currentPage - 1) * rowsPerPage)
       .limit(rowsPerPage);
 
@@ -219,11 +304,11 @@ const getStudents = async (req, res) => {
         totalStudents,
         currentPage,
         rowsPerPage,
-        totalPages: Math.ceil(totalStudents / rowsPerPage),
+        totalPages: Math.ceil(totalStudents / rowsPerPage) || 1,
       },
     });
   } catch (error) {
-    console.error(error);
+    console.error("Get Students Error:", error);
 
     return res.status(500).json({
       success: false,

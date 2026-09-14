@@ -5,20 +5,13 @@ const VivaSession = require("../models/VivaSession");
 const VivaConfiguration = require("../models/VivaConfiguration");
 const Question = require("../models/Question");
 const Student = require("../models/Student");
-const VivaAttempt = require("../models/VivaAttempt");
-const {
-  evaluateVivaAttempt,
-} = require("../services/vivaEvaluationService");
-
+const Assignment = require("../models/Assignment");
 // ======================================================
 // Generate Unique Session ID
 // ======================================================
 
 const generateSessionId = () => {
-  return crypto
-    .randomBytes(6)
-    .toString("hex")
-    .toUpperCase();
+  return crypto.randomBytes(6).toString("hex").toUpperCase();
 };
 
 // ======================================================
@@ -39,9 +32,7 @@ const getTeacherId = (req) => {
 // Normalize Questions
 // ======================================================
 
-const normalizeQuestions = (
-  questions
-) => {
+const normalizeQuestions = (questions) => {
   if (!Array.isArray(questions)) {
     return [];
   }
@@ -59,8 +50,7 @@ const normalizeQuestions = (
 
       if (
         !questionText ||
-        typeof questionText !==
-          "string" ||
+        typeof questionText !== "string" ||
         !questionText.trim()
       ) {
         return null;
@@ -70,1987 +60,1678 @@ const normalizeQuestions = (
 
       if (
         item.questionId &&
-        mongoose.Types.ObjectId.isValid(
-          item.questionId
-        )
+        mongoose.Types.ObjectId.isValid(item.questionId)
       ) {
         questionId = item.questionId;
       } else if (
         item._id &&
-        mongoose.Types.ObjectId.isValid(
-          item._id
-        )
+        mongoose.Types.ObjectId.isValid(item._id)
       ) {
         questionId = item._id;
       }
 
       return {
         questionId,
-        question:
-          questionText.trim(),
+        question: questionText.trim(),
         difficulty:
-          item.difficulty ||
-          "Medium",
+          item.difficulty || "Medium",
       };
     })
     .filter(Boolean);
 };
 
 // ======================================================
-// CREATE VIVA SESSION
+// Create Viva Session
 // POST /api/viva-sessions
 // ======================================================
 
-const createVivaSession =
-  async (req, res) => {
-    try {
-      const teacherId =
-        getTeacherId(req);
+const createVivaSession = async (req, res) => {
+  try {
+    const teacherId = getTeacherId(req);
 
-      if (!teacherId) {
-        return res.status(401).json({
-          success: false,
-          message:
-            "Teacher authentication is required.",
-        });
-      }
+    if (!teacherId) {
+      return res.status(401).json({
+        success: false,
+        message: "Teacher authentication is required.",
+      });
+    }
 
-      const {
-        assignment,
-        assignmentId,
-        vivaConfigurationId,
-        classId,
-        department,
-        subject,
-        questions,
-        questionIds,
-        studentsPerViva,
-        selectedStudents,
-        studentSelectionMode,
-        numberOfQuestions,
-        difficulty,
-        questionType,
-        timeLimit,
-        timeMode,
-        totalMarks,
-        language,
-        rules,
-        aiSettings,
-      } = req.body;
+    const {
+      vivaConfigurationId,
+      assignment,
+      classId,
+      department,
+      subject,
+      questions,
+      studentsPerViva,
+      selectedStudents,
+      studentSelectionMode,
+      numberOfQuestions,
+      difficulty,
+      questionType,
+      timeLimit,
+      timeMode,
+      totalMarks,
+      language,
+      rules,
+      aiSettings,
+    } = req.body;
 
-      // ==================================================
-      // ASSIGNMENT
-      // ==================================================
+    // ==================================================
+    // Basic Validation
+    // ==================================================
 
-      const finalAssignmentId =
-        assignmentId || assignment;
+    if (
+      !assignment ||
+      !mongoose.Types.ObjectId.isValid(assignment)
+    ) {
+      return res.status(400).json({
+        success: false,
+        message: "A valid assignment is required.",
+      });
+    }
 
-      if (
-        !finalAssignmentId ||
-        !mongoose.Types.ObjectId.isValid(
-          finalAssignmentId
-        )
-      ) {
-        return res.status(400).json({
-          success: false,
-          message:
-            "A valid assignment is required.",
-        });
-      }
+    // Auto-resolve missing class, department, or subject from Assignment
+    let resolvedClassId = classId;
+    let resolvedDepartment = department;
+    let resolvedSubject = subject;
 
-      // ==================================================
-      // LOAD ASSIGNMENT
-      // ==================================================
-
-      const Assignment =
-        require("../models/Assignment");
-
-      const assignmentDocument =
-        await Assignment.findOne({
-          _id: finalAssignmentId,
-          teacher: teacherId,
-          status: "Active",
-        }).lean();
-
-      if (!assignmentDocument) {
+    if (!resolvedClassId || !resolvedDepartment || !resolvedSubject) {
+      const assignmentDoc = await Assignment.findById(assignment);
+      if (!assignmentDoc) {
         return res.status(404).json({
           success: false,
-          message:
-            "The selected assignment was not found or is not assigned to this teacher.",
+          message: "Assignment record not found.",
         });
       }
+      resolvedClassId = resolvedClassId || assignmentDoc.class;
+      resolvedDepartment = resolvedDepartment || assignmentDoc.department;
+      resolvedSubject = resolvedSubject || assignmentDoc.subject;
+    }
 
-      // ==================================================
-      // GET CLASS / DEPARTMENT / SUBJECT
-      // ==================================================
+    if (!resolvedClassId || !mongoose.Types.ObjectId.isValid(resolvedClassId)) {
+      return res.status(400).json({
+        success: false,
+        message: "A valid class is required.",
+      });
+    }
 
-      const finalClassId =
-        assignmentDocument.class ||
-        classId;
+    if (!resolvedDepartment || !mongoose.Types.ObjectId.isValid(resolvedDepartment)) {
+      return res.status(400).json({
+        success: false,
+        message: "A valid department is required.",
+      });
+    }
 
-      const finalDepartmentId =
-        assignmentDocument.department ||
-        department;
+    if (!resolvedSubject || !mongoose.Types.ObjectId.isValid(resolvedSubject)) {
+      return res.status(400).json({
+        success: false,
+        message: "A valid subject is required.",
+      });
+    }
 
-      const finalSubjectId =
-        assignmentDocument.subject ||
-        subject;
+    // ==================================================
+    // Load Existing Configuration
+    // ==================================================
 
-      // ==================================================
-      // VALIDATE CLASS
-      // ==================================================
+    let configuration = null;
 
-      if (
-        !finalClassId ||
-        !mongoose.Types.ObjectId.isValid(
-          finalClassId
-        )
-      ) {
-        return res.status(400).json({
-          success: false,
-          message:
-            "The selected assignment does not contain a valid class.",
-        });
-      }
-
-      // ==================================================
-      // VALIDATE DEPARTMENT
-      // ==================================================
-
-      if (
-        !finalDepartmentId ||
-        !mongoose.Types.ObjectId.isValid(
-          finalDepartmentId
-        )
-      ) {
-        return res.status(400).json({
-          success: false,
-          message:
-            "The selected assignment does not contain a valid department.",
-        });
-      }
-
-      // ==================================================
-      // VALIDATE SUBJECT
-      // ==================================================
-
-      if (
-        !finalSubjectId ||
-        !mongoose.Types.ObjectId.isValid(
-          finalSubjectId
-        )
-      ) {
-        return res.status(400).json({
-          success: false,
-          message:
-            "The selected assignment does not contain a valid subject.",
-        });
-      }
-
-      // ==================================================
-      // LOAD CONFIGURATION
-      // ==================================================
-
-      let configuration = null;
-
-      if (
-        vivaConfigurationId &&
-        mongoose.Types.ObjectId.isValid(
+    if (
+      vivaConfigurationId &&
+      mongoose.Types.ObjectId.isValid(
+        vivaConfigurationId
+      )
+    ) {
+      configuration =
+        await VivaConfiguration.findById(
           vivaConfigurationId
-        )
-      ) {
-        configuration =
-          await VivaConfiguration.findById(
-            vivaConfigurationId
-          );
-
-        if (!configuration) {
-          return res.status(404).json({
-            success: false,
-            message:
-              "Viva configuration not found.",
-          });
-        }
-
-        if (
-          configuration.teacher &&
-          configuration.teacher.toString() !==
-            teacherId.toString()
-        ) {
-          return res.status(403).json({
-            success: false,
-            message:
-              "You are not authorized to use this viva configuration.",
-          });
-        }
-      }
-
-      // ==================================================
-      // QUESTIONS
-      // ==================================================
-
-      let sessionQuestions =
-        normalizeQuestions(
-          questions
         );
 
-      if (
-        sessionQuestions.length ===
-          0 &&
-        Array.isArray(questionIds) &&
-        questionIds.length > 0
-      ) {
-        const validIds =
-          questionIds.filter((id) =>
-            mongoose.Types.ObjectId.isValid(
-              id
-            )
-          );
-
-        if (validIds.length > 0) {
-          const dbQuestions =
-            await Question.find({
-              _id: {
-                $in: validIds,
-              },
-            }).lean();
-
-          sessionQuestions =
-            normalizeQuestions(
-              dbQuestions
-            );
-        }
-      }
-
-      if (
-        sessionQuestions.length ===
-        0
-      ) {
-        return res.status(400).json({
-          success: false,
-          message:
-            "No generated questions were provided. Please generate questions before creating the viva session.",
-        });
-      }
-
-      // ==================================================
-      // UNIQUE SESSION ID
-      // ==================================================
-
-      let sessionId;
-      let exists = true;
-
-      while (exists) {
-        sessionId =
-          generateSessionId();
-
-        exists =
-          await VivaSession.exists({
-            sessionId,
-          });
-      }
-
-      // ==================================================
-      // CONFIGURATION VALUES
-      // ==================================================
-
-      const finalStudentsPerViva =
-        studentsPerViva ??
-        configuration?.studentsPerViva ??
-        1;
-
-      const finalNumberOfQuestions =
-        numberOfQuestions ??
-        configuration?.numberOfQuestions ??
-        sessionQuestions.length;
-
-      const finalDifficulty =
-        difficulty ??
-        configuration?.difficulty ??
-        "Medium";
-
-      const finalQuestionType =
-        questionType ??
-        configuration?.questionType ??
-        "Mixed";
-
-      const finalTimeLimit =
-        timeLimit ??
-        configuration?.timeLimit ??
-        5;
-
-      const finalTimeMode =
-        timeMode ??
-        configuration?.timeType ??
-        "perStudent";
-
-      const finalTotalMarks =
-        totalMarks ??
-        configuration?.totalMarks ??
-        20;
-
-      const finalLanguage =
-        language ??
-        configuration?.language ??
-        "English";
-
-      const finalRules =
-        rules ||
-        configuration?.rules || {
-          randomQuestions: true,
-          noRepeatedQuestions: true,
-          allowSkip: true,
-          followUpQuestions: false,
-          hintMode: false,
-          autoSave: true,
-        };
-
-      const finalAISettings =
-        aiSettings ||
-        configuration?.aiSettings || {
-          voice: "Female",
-          speechSpeed: "Normal",
-          personality:
-            "Professional",
-        };
-
-      // ==================================================
-      // CREATE SESSION
-      // ==================================================
-
-      const session =
-        await VivaSession.create({
-          sessionId,
-
-          teacher: teacherId,
-
-          assignment:
-            finalAssignmentId,
-
-          class:
-            finalClassId,
-
-          department:
-            finalDepartmentId,
-
-          subject:
-            finalSubjectId,
-
-          vivaConfiguration:
-            vivaConfigurationId ||
-            null,
-
-          questions:
-            sessionQuestions,
-
-          studentsPerViva:
-            finalStudentsPerViva,
-
-          selectedStudents:
-            Array.isArray(
-              selectedStudents
-            )
-              ? selectedStudents
-              : [],
-
-          studentSelectionMode:
-            studentSelectionMode ||
-            "all",
-
-          numberOfQuestions:
-            finalNumberOfQuestions,
-
-          difficulty:
-            finalDifficulty,
-
-          questionType:
-            finalQuestionType,
-
-          timeLimit:
-            finalTimeLimit,
-
-          timeMode:
-            finalTimeMode,
-
-          totalMarks:
-            finalTotalMarks,
-
-          language:
-            finalLanguage,
-
-          rules:
-            finalRules,
-
-          aiSettings:
-            finalAISettings,
-
-          status: "Configured",
-        });
-
-      return res.status(201).json({
-        success: true,
-        message:
-          "Viva session created successfully.",
-
-        session: {
-          id: session._id,
-          sessionId:
-            session.sessionId,
-          status:
-            session.status,
-        },
-      });
-    } catch (error) {
-      console.error(
-        "createVivaSession Error:",
-        error
-      );
-
-      return res.status(500).json({
-        success: false,
-        message:
-          "Unable to create Viva session.",
-      });
-    }
-  };
-
-// ======================================================
-// GET VIVA SESSION
-// Teacher only
-// ======================================================
-
-const getVivaSession =
-  async (req, res) => {
-    try {
-      const { sessionId } =
-        req.params;
-
-      const teacherId =
-        getTeacherId(req);
-
-      if (!teacherId) {
-        return res.status(401).json({
-          success: false,
-          message:
-            "Teacher authentication is required.",
-        });
-      }
-
-      const session =
-        await VivaSession.findOne({
-          sessionId,
-          teacher: teacherId,
-        });
-
-      if (!session) {
+      if (!configuration) {
         return res.status(404).json({
           success: false,
-          message:
-            "Viva session not found.",
+          message: "Viva configuration not found.",
         });
       }
 
-      return res.status(200).json({
-        success: true,
-        session,
-      });
-    } catch (error) {
-      console.error(
-        "getVivaSession Error:",
-        error
-      );
-
-      return res.status(500).json({
-        success: false,
-        message:
-          "Unable to fetch Viva session.",
-      });
-    }
-  };
-
-// ======================================================
-// GET STUDENT VIVA SHARE LINK
-// ======================================================
-
-const getStudentVivaLink =
-  async (req, res) => {
-    try {
-      const { sessionId } =
-        req.params;
-
-      const teacherId =
-        getTeacherId(req);
-
-      if (!teacherId) {
-        return res.status(401).json({
-          success: false,
-          message:
-            "Teacher authentication is required.",
-        });
-      }
-
-      const session =
-        await VivaSession.findOne({
-          sessionId,
-          teacher: teacherId,
-        });
-
-      if (!session) {
-        return res.status(404).json({
-          success: false,
-          message:
-            "Viva session not found.",
-        });
-      }
-
-      const baseUrl =
-        process.env.CLIENT_URL ||
-        "http://localhost:5173";
-
-      const shareLink =
-        `${baseUrl}/viva/${encodeURIComponent(
-          session.sessionId
-        )}`;
-
-      return res.status(200).json({
-        success: true,
-
-        sessionId:
-          session.sessionId,
-
-        shareLink,
-      });
-    } catch (error) {
-      console.error(
-        "getStudentVivaLink Error:",
-        error
-      );
-
-      return res.status(500).json({
-        success: false,
-        message:
-          "Unable to generate Viva link.",
-      });
-    }
-  };
-
-// ======================================================
-// JOIN VIVA SESSION
-// ======================================================
-
-const joinVivaSession =
-  async (req, res) => {
-    try {
-      const { sessionId } =
-        req.params;
-
-      const {
-        enrollmentNumber,
-        studentName,
-      } = req.body || {};
-
-      const cleanEnrollment =
-        String(
-          enrollmentNumber || ""
-        ).trim();
-
-      if (!cleanEnrollment) {
-        return res.status(400).json({
-          success: false,
-          message:
-            "Enrollment number is required.",
-        });
-      }
-
-      const session =
-        await VivaSession.findOne({
-          sessionId,
-        });
-
-      if (!session) {
-        return res.status(404).json({
-          success: false,
-          message:
-            "Viva session not found.",
-        });
-      }
-
+      // Make sure teacher cannot use somebody else's config
       if (
-        session.status !==
-        "Active"
-      ) {
-        return res.status(400).json({
-          success: false,
-          message:
-            "This Viva session is not active.",
-        });
-      }
-
-      const student =
-        await Student.findOne({
-          $or: [
-            {
-              enrollmentNumber:
-                cleanEnrollment,
-            },
-            {
-              enrollmentNo:
-                cleanEnrollment,
-            },
-            {
-              enrollment:
-                cleanEnrollment,
-            },
-          ],
-        });
-
-      if (!student) {
-        return res.status(404).json({
-          success: false,
-          message:
-            "Student not found. Please check your enrollment number.",
-        });
-      }
-
-      if (
-        student.class &&
-        session.class &&
-        String(
-          student.class
-        ) !==
-          String(
-            session.class
-          )
+        configuration.teacher &&
+        configuration.teacher.toString() !==
+          teacherId.toString()
       ) {
         return res.status(403).json({
           success: false,
           message:
-            "This student does not belong to this Viva class.",
+            "You are not authorized to use this viva configuration.",
         });
       }
+    }
 
-      if (
-        session.studentSelectionMode ===
-          "selected" &&
-        Array.isArray(
-          session.selectedStudents
-        )
-      ) {
-        const allowed =
-          session.selectedStudents.some(
-            (studentId) =>
-              String(studentId) ===
-              String(student._id)
-          );
+    // ==================================================
+    // Questions
+    // ==================================================
 
-        if (!allowed) {
-          return res.status(403).json({
-            success: false,
-            message:
-              "You are not selected for this Viva.",
-          });
-        }
+    let sessionQuestions = normalizeQuestions(
+      questions
+    );
+
+    /*
+      If question IDs are provided instead of full
+      question objects, load the questions from DB.
+    */
+
+    if (
+      sessionQuestions.length === 0 &&
+      Array.isArray(req.body.questionIds) &&
+      req.body.questionIds.length > 0
+    ) {
+      const validIds =
+        req.body.questionIds.filter((id) =>
+          mongoose.Types.ObjectId.isValid(id)
+        );
+
+      if (validIds.length > 0) {
+        const dbQuestions = await Question.find({
+          _id: { $in: validIds },
+        }).lean();
+
+        sessionQuestions = normalizeQuestions(
+          dbQuestions
+        );
       }
+    }
 
-      let attempt =
-        await VivaAttempt.findOne({
-          vivaSession:
-            session._id,
-          student:
-            student._id,
-        });
-
-      if (!attempt) {
-        attempt =
-          await VivaAttempt.create({
-            vivaSession:
-              session._id,
-
-            student:
-              student._id,
-
-            status:
-              "NotStarted",
-
-            currentQuestionIndex:
-              0,
-
-            questionIdsAsked: [],
-
-            answers: [],
-
-            evaluated: false,
-
-            totalMarks: 0,
-          });
-      }
-
-      return res.status(200).json({
-        success: true,
-
-        message:
-          "Student joined Viva successfully.",
-
-        attempt: {
-          attemptId:
-            attempt._id,
-
-          status:
-            attempt.status,
-
-          currentQuestionIndex:
-            attempt.currentQuestionIndex,
-
-          startedAt:
-            attempt.startedAt,
-        },
-
-        student: {
-          name:
-            student.name ||
-            student.studentName ||
-            studentName ||
-            "",
-
-          enrollmentNumber:
-            cleanEnrollment,
-        },
-
-        session: {
-          sessionId:
-            session.sessionId,
-
-          language:
-            session.language,
-
-          numberOfQuestions:
-            session.numberOfQuestions,
-
-          timeLimit:
-            session.timeLimit,
-
-          timeMode:
-            session.timeMode,
-
-          aiSettings:
-            session.aiSettings,
-        },
-      });
-    } catch (error) {
-      console.error(
-        "joinVivaSession Error:",
-        error
-      );
-
-      return res.status(500).json({
+    if (sessionQuestions.length === 0) {
+      return res.status(400).json({
         success: false,
         message:
-          "Unable to join Viva.",
+          "No generated questions were provided. Please generate questions before creating the viva session.",
       });
     }
-  };
 
-// ======================================================
-// START VIVA SESSION
-// ======================================================
+    // ==================================================
+    // Generate Unique Session ID
+    // ==================================================
 
-const startVivaSession =
-  async (req, res) => {
-    try {
-      const { sessionId } =
-        req.params;
+    let sessionId;
+    let exists = true;
 
-      const {
-        attemptId,
-      } = req.body || {};
+    while (exists) {
+      sessionId = generateSessionId();
 
-      if (
-        !attemptId ||
-        !mongoose.Types.ObjectId.isValid(
-          attemptId
-        )
-      ) {
-        return res.status(400).json({
-          success: false,
-          message:
-            "Valid attempt ID is required.",
-        });
-      }
-
-      const session =
-        await VivaSession.findOne({
-          sessionId,
-        });
-
-      if (!session) {
-        return res.status(404).json({
-          success: false,
-          message:
-            "Viva session not found.",
-        });
-      }
-
-      if (
-        session.status ===
-        "Configured"
-      ) {
-        session.status =
-          "Active";
-
-        session.startedAt =
-          new Date();
-
-        await session.save();
-      }
-
-      if (
-        session.status !==
-        "Active"
-      ) {
-        return res.status(400).json({
-          success: false,
-          message:
-            "Viva session cannot be started.",
-        });
-      }
-
-      const attempt =
-        await VivaAttempt.findOne({
-          _id:
-            attemptId,
-
-          vivaSession:
-            session._id,
-        });
-
-      if (!attempt) {
-        return res.status(404).json({
-          success: false,
-          message:
-            "Viva attempt not found.",
-        });
-      }
-
-      if (
-        attempt.status ===
-        "Completed"
-      ) {
-        return res.status(400).json({
-          success: false,
-          message:
-            "This Viva attempt is already completed.",
-        });
-      }
-
-      if (
-        attempt.status !==
-        "Active"
-      ) {
-        attempt.status =
-          "Active";
-
-        attempt.startedAt =
-          new Date();
-
-        attempt.currentQuestionIndex =
-          0;
-
-        await attempt.save();
-      }
-
-      return res.status(200).json({
-        success: true,
-
-        message:
-          "Viva started successfully.",
-
-        attempt: {
-          attemptId:
-            attempt._id,
-
-          status:
-            attempt.status,
-
-          currentQuestionIndex:
-            attempt.currentQuestionIndex,
-
-          startedAt:
-            attempt.startedAt,
-        },
-      });
-    } catch (error) {
-      console.error(
-        "startVivaSession Error:",
-        error
-      );
-
-      return res.status(500).json({
-        success: false,
-        message:
-          "Unable to start Viva.",
-      });
-    }
-  };
-
-// ======================================================
-// GET NEXT VIVA QUESTION
-// ======================================================
-
-const getNextVivaQuestion =
-  async (req, res) => {
-    try {
-      const {
+      exists = await VivaSession.exists({
         sessionId,
-        questionNumber,
-      } = req.params;
+      });
+    }
 
-      const session =
-        await VivaSession.findOne({
-          sessionId,
-        });
+    // ==================================================
+    // Use Configuration Defaults When Available
+    // ==================================================
 
-      if (!session) {
-        return res.status(404).json({
+    const finalStudentsPerViva =
+      studentsPerViva ??
+      configuration?.studentsPerViva ??
+      1;
+
+    const finalNumberOfQuestions =
+      numberOfQuestions ??
+      configuration?.numberOfQuestions ??
+      sessionQuestions.length;
+
+    const finalDifficulty =
+      difficulty ??
+      configuration?.difficulty ??
+      "Medium";
+
+    const finalQuestionType =
+      questionType ??
+      configuration?.questionType ??
+      "Mixed";
+
+    const finalTimeLimit =
+      timeLimit ??
+      configuration?.timeLimit ??
+      5;
+
+    const finalTimeMode =
+      timeMode ??
+      configuration?.timeType ??
+      "perStudent";
+
+    const finalTotalMarks =
+      totalMarks ??
+      configuration?.totalMarks ??
+      20;
+
+    const finalLanguage =
+      language ??
+      configuration?.language ??
+      "English";
+
+    const finalRules =
+      rules ||
+      configuration?.rules || {
+        randomQuestions: true,
+        noRepeatedQuestions: true,
+        allowSkip: true,
+        followUpQuestions: false,
+        hintMode: false,
+        autoSave: true,
+      };
+
+    const finalAISettings =
+      aiSettings ||
+      configuration?.aiSettings || {
+        voice: "Female",
+        speechSpeed: "Normal",
+        personality: "Professional",
+      };
+
+    // ==================================================
+    // Create Session
+    // ==================================================
+
+    const vivaSession =
+      await VivaSession.create({
+        sessionId,
+
+        teacher: teacherId,
+
+        assignment,
+
+        class: resolvedClassId,
+
+        department: resolvedDepartment,
+
+        subject: resolvedSubject,
+
+        vivaConfiguration:
+          configuration?._id || null,
+
+        questions: sessionQuestions,
+
+        studentsPerViva:
+          finalStudentsPerViva,
+
+        selectedStudents:
+          Array.isArray(selectedStudents)
+            ? selectedStudents
+            : [],
+
+        studentSelectionMode:
+          studentSelectionMode || "all",
+
+        numberOfQuestions:
+          finalNumberOfQuestions,
+
+        difficulty:
+          finalDifficulty,
+
+        questionType:
+          finalQuestionType,
+
+        timeLimit:
+          finalTimeLimit,
+
+        timeMode:
+          finalTimeMode,
+
+        totalMarks:
+          finalTotalMarks,
+
+        language:
+          finalLanguage,
+
+        rules:
+          finalRules,
+
+        aiSettings:
+          finalAISettings,
+
+        status: "Configured",
+      });
+
+    // ==================================================
+    // Update Configuration Status
+    // ==================================================
+
+    if (configuration) {
+      configuration.status = "Active";
+      await configuration.save();
+    }
+
+    // ==================================================
+    // Response
+    // ==================================================
+
+    return res.status(201).json({
+      success: true,
+      message:
+        "Viva session created successfully.",
+
+      session: {
+        id: vivaSession._id,
+        sessionId: vivaSession.sessionId,
+        status: vivaSession.status,
+        totalQuestions:
+          vivaSession.questions.length,
+        numberOfQuestions:
+          vivaSession.numberOfQuestions,
+        difficulty:
+          vivaSession.difficulty,
+        language:
+          vivaSession.language,
+      },
+    });
+  } catch (error) {
+    console.error(
+      "Create Viva Session Error:",
+      error
+    );
+
+    return res.status(500).json({
+      success: false,
+      message:
+        "Failed to create viva session.",
+      error: error.message,
+    });
+  }
+};
+
+// ======================================================
+// Get Single Viva Session
+// GET /api/viva-sessions/:sessionId
+// ======================================================
+
+const getVivaSession = async (req, res) => {
+  try {
+    const teacherId = getTeacherId(req);
+    const { sessionId } = req.params;
+
+    if (!teacherId) {
+      return res.status(401).json({
+        success: false,
+        message: "Authentication is required.",
+      });
+    }
+
+    const session =
+      await VivaSession.findOne({
+        sessionId,
+        teacher: teacherId,
+      })
+        .populate("class")
+        .populate("subject")
+        .populate("department");
+
+    if (!session) {
+      return res.status(404).json({
+        success: false,
+        message: "Viva session not found.",
+      });
+    }
+
+    return res.status(200).json({
+      success: true,
+      session,
+    });
+  } catch (error) {
+    console.error(
+      "Get Viva Session Error:",
+      error
+    );
+
+    return res.status(500).json({
+      success: false,
+      message:
+        "Failed to fetch viva session.",
+      error: error.message,
+    });
+  }
+};
+
+// ======================================================
+// Get All Viva Sessions for Teacher (Phase 14)
+// GET /api/viva-sessions
+// ======================================================
+
+const getTeacherVivaSessions = async (req, res) => {
+  try {
+    const teacherId = getTeacherId(req);
+
+    if (!teacherId) {
+      return res.status(401).json({
+        success: false,
+        message: "Authentication is required.",
+      });
+    }
+
+    const sessions = await VivaSession.find({ teacher: teacherId })
+      .populate("class", "name className")
+      .populate("subject", "name subjectName")
+      .populate("department", "name departmentName")
+      .sort({ createdAt: -1 })
+      .lean();
+
+    const VivaAttempt = require("../models/VivaAttempt");
+
+    const sessionList = await Promise.all(
+      sessions.map(async (sess) => {
+        const attempts = await VivaAttempt.find({ vivaSession: sess._id }).lean();
+        const completedAttempts = attempts.filter((a) => a.status === "Completed");
+        const evaluatedAttempts = completedAttempts.filter((a) => a.evaluated);
+
+        let avgMarks = 0;
+        if (evaluatedAttempts.length > 0) {
+          const sum = evaluatedAttempts.reduce((acc, curr) => acc + (curr.totalMarks || 0), 0);
+          avgMarks = Math.round((sum / evaluatedAttempts.length) * 10) / 10;
+        }
+
+        return {
+          _id: sess._id,
+          sessionId: sess.sessionId,
+          topic: sess.topic || "Viva Session",
+          class: sess.class?.name || sess.class?.className || "—",
+          subject: sess.subject?.name || sess.subject?.subjectName || "—",
+          department: sess.department?.name || sess.department?.departmentName || "—",
+          numberOfQuestions: sess.numberOfQuestions || sess.questions?.length || 0,
+          totalMarks: sess.totalMarks || 20,
+          difficulty: sess.difficulty || "Medium",
+          status: sess.status,
+          totalAttempts: attempts.length,
+          completedCount: completedAttempts.length,
+          averageMarks: avgMarks,
+          createdAt: sess.createdAt,
+        };
+      })
+    );
+
+    return res.status(200).json({
+      success: true,
+      sessions: sessionList,
+    });
+  } catch (error) {
+    console.error("Get Teacher Viva Sessions Error:", error);
+    return res.status(500).json({
+      success: false,
+      message: "Failed to fetch teacher viva sessions.",
+      error: error.message,
+    });
+  }
+};
+
+// ======================================================
+// Get Detailed Session Analytics for Teacher (Phase 14)
+// GET /api/viva-sessions/:sessionId/analytics
+// ======================================================
+
+const getSessionAnalytics = async (req, res) => {
+  try {
+    const teacherId = getTeacherId(req);
+    const { sessionId } = req.params;
+
+    if (!teacherId) {
+      return res.status(401).json({
+        success: false,
+        message: "Authentication is required.",
+      });
+    }
+
+    const session = await VivaSession.findOne({
+      sessionId: sessionId.trim(),
+      teacher: teacherId,
+    })
+      .populate("class")
+      .populate("subject")
+      .populate("department")
+      .lean();
+
+    if (!session) {
+      return res.status(404).json({
+        success: false,
+        message: "Viva session not found.",
+      });
+    }
+
+    const VivaAttempt = require("../models/VivaAttempt");
+    const Student = require("../models/Student");
+
+    // Resolve eligible students (Option A vs Option B)
+    let eligibleStudents = [];
+    if (session.studentSelectionMode === "selected" && Array.isArray(session.selectedStudents) && session.selectedStudents.length > 0) {
+      eligibleStudents = await Student.find({
+        _id: { $in: session.selectedStudents },
+      }).lean();
+    } else if (session.class) {
+      const classIdStr = session.class._id ? session.class._id.toString() : session.class.toString();
+      eligibleStudents = await Student.find({
+        $or: [
+          { class: session.class._id || session.class },
+          { classId: classIdStr },
+        ],
+      }).lean();
+    }
+
+    // Fetch all attempts for this session
+    const attempts = await VivaAttempt.find({
+      vivaSession: session._id,
+    })
+      .populate("student")
+      .lean();
+
+    const attemptByStudentId = new Map();
+    const attemptByEnrollment = new Map();
+
+    attempts.forEach((att) => {
+      if (att.student && att.student._id) {
+        attemptByStudentId.set(att.student._id.toString(), att);
+        const enr = att.student.enrollmentNumber || att.student.enrollment;
+        if (enr) attemptByEnrollment.set(enr.trim().toLowerCase(), att);
+      }
+    });
+
+    const completedAttempts = attempts.filter((a) => a.status === "Completed");
+    const evaluatedAttempts = completedAttempts.filter((a) => a.evaluated);
+
+    let highestMarks = 0;
+    let lowestMarks = session.totalMarks || 20;
+    let totalMarksSum = 0;
+
+    if (evaluatedAttempts.length > 0) {
+      evaluatedAttempts.forEach((a) => {
+        const m = a.totalMarks || 0;
+        totalMarksSum += m;
+        if (m > highestMarks) highestMarks = m;
+        if (m < lowestMarks) lowestMarks = m;
+      });
+    } else {
+      lowestMarks = 0;
+    }
+
+    const avgMarks = evaluatedAttempts.length > 0
+      ? Math.round((totalMarksSum / evaluatedAttempts.length) * 10) / 10
+      : 0;
+
+    // Build per-student records
+    const studentResults = eligibleStudents.map((st) => {
+      const stId = st._id.toString();
+      const stEnr = (st.enrollmentNumber || st.enrollment || "").trim().toLowerCase();
+      const att = attemptByStudentId.get(stId) || attemptByEnrollment.get(stEnr) || null;
+
+      const isCompleted = att?.status === "Completed";
+      const isEvaluated = Boolean(att?.evaluated);
+      const studentMarks = isEvaluated ? att.totalMarks : (st.marks || 0);
+      const maxMarks = session.totalMarks || 20;
+      const percentage = isEvaluated ? Math.round((studentMarks / maxMarks) * 100) : null;
+
+      return {
+        studentId: st._id,
+        name: st.name || st.studentName || "—",
+        enrollmentNumber: st.enrollmentNumber || st.enrollment || "—",
+        email: st.email || "",
+        vivaStatus: isCompleted ? "Completed" : "Pending",
+        attemptStatus: att?.status || "NotStarted",
+        evaluated: isEvaluated,
+        marks: isEvaluated ? studentMarks : null,
+        maxMarks,
+        percentage,
+        completedAt: att?.completedAt || null,
+        answers: att?.answers || [],
+      };
+    });
+
+    return res.status(200).json({
+      success: true,
+      session: {
+        _id: session._id,
+        sessionId: session.sessionId,
+        topic: session.topic || "Viva Session",
+        class: session.class?.name || session.class?.className || "—",
+        subject: session.subject?.name || session.subject?.subjectName || "—",
+        department: session.department?.name || session.department?.departmentName || "—",
+        totalMarks: session.totalMarks || 20,
+        numberOfQuestions: session.numberOfQuestions || session.questions?.length || 0,
+        difficulty: session.difficulty || "Medium",
+        status: session.status,
+        createdAt: session.createdAt,
+      },
+      metrics: {
+        totalStudents: eligibleStudents.length,
+        completedCount: completedAttempts.length,
+        pendingCount: Math.max(0, eligibleStudents.length - completedAttempts.length),
+        evaluatedCount: evaluatedAttempts.length,
+        averageMarks: avgMarks,
+        highestMarks,
+        lowestMarks,
+      },
+      students: studentResults,
+    });
+  } catch (error) {
+    console.error("Get Session Analytics Error:", error);
+    return res.status(500).json({
+      success: false,
+      message: "Failed to fetch session analytics.",
+      error: error.message,
+    });
+  }
+};
+
+// ======================================================
+// Generate / Get Student Viva Link
+// GET /api/viva-sessions/:sessionId/share-link
+// ======================================================
+
+const getStudentVivaLink = async (req, res) => {
+  try {
+    const teacherId = getTeacherId(req);
+    const { sessionId } = req.params;
+
+    if (!teacherId) {
+      return res.status(401).json({
+        success: false,
+        message: "Authentication is required.",
+      });
+    }
+
+    if (!sessionId || !sessionId.trim()) {
+      return res.status(400).json({
+        success: false,
+        message: "Viva session ID is required.",
+      });
+    }
+
+    const session = await VivaSession.findOne({
+      sessionId: sessionId.trim(),
+      teacher: teacherId,
+    });
+
+    if (!session) {
+      return res.status(404).json({
+        success: false,
+        message: "Viva session not found.",
+      });
+    }
+
+    if (
+      session.status === "Completed" ||
+      session.status === "Cancelled"
+    ) {
+      return res.status(400).json({
+        success: false,
+        message:
+          "This viva session is no longer available.",
+      });
+    }
+
+    /*
+     * The frontend URL is configurable.
+     *
+     * For local development:
+     * CLIENT_URL=http://localhost:5173
+     *
+     * Later in production:
+     * CLIENT_URL=https://your-domain.com
+     */
+
+    const clientUrl = (
+      process.env.CLIENT_URL ||
+      "http://localhost:5173"
+    ).replace(/\/+$/, "");
+
+    const studentVivaLink =
+      `${clientUrl}/viva/${encodeURIComponent(
+        session.sessionId
+      )}`;
+
+    return res.status(200).json({
+      success: true,
+
+      session: {
+        id: session._id,
+        sessionId: session.sessionId,
+        status: session.status,
+      },
+
+      link: studentVivaLink,
+    });
+  } catch (error) {
+    console.error(
+      "Get Student Viva Link Error:",
+      error
+    );
+
+    return res.status(500).json({
+      success: false,
+      message:
+        "Failed to generate student viva link.",
+      error: error.message,
+    });
+  }
+};
+// ======================================================
+// Student Join / Verify
+// POST /api/viva-sessions/:sessionId/join
+// ======================================================
+
+const joinVivaSession = async (req, res) => {
+  try {
+    const { sessionId } = req.params;
+    const { enrollmentNumber, studentName } = req.body;
+
+    // --------------------------------------------------
+    // Basic validation
+    // --------------------------------------------------
+
+    if (!sessionId || !sessionId.trim()) {
+      return res.status(400).json({
+        success: false,
+        message: "Viva session ID is required.",
+      });
+    }
+
+    if (
+      !enrollmentNumber ||
+      !enrollmentNumber.trim()
+    ) {
+      return res.status(400).json({
+        success: false,
+        message: "Enrollment number is required.",
+      });
+    }
+
+    // --------------------------------------------------
+    // Find Viva Session
+    // --------------------------------------------------
+
+    const session = await VivaSession.findOne({
+      sessionId: sessionId.trim(),
+    }).populate("class");
+
+    if (!session) {
+      return res.status(404).json({
+        success: false,
+        message: "Viva session not found.",
+      });
+    }
+
+    // --------------------------------------------------
+    // Session status check
+    // --------------------------------------------------
+
+    if (
+      session.status === "Completed" ||
+      session.status === "Cancelled"
+    ) {
+      return res.status(400).json({
+        success: false,
+        message:
+          "This viva session is no longer available.",
+      });
+    }
+
+    // --------------------------------------------------
+    // Find Student
+    // --------------------------------------------------
+
+    const Student = require("../models/Student");
+
+    const cleanEnrollment =
+      enrollmentNumber.trim();
+
+    const student = await Student.findOne({
+      $or: [
+        { enrollment: cleanEnrollment },
+        { enrollmentNumber: cleanEnrollment },
+        { enrollmentNo: cleanEnrollment },
+      ],
+    });
+
+    if (!student) {
+      return res.status(404).json({
+        success: false,
+        message:
+          "Student not found. Please check your enrollment number.",
+      });
+    }
+
+    // --------------------------------------------------
+    // Verify Student belongs to session
+    // --------------------------------------------------
+
+    let studentAllowed = false;
+
+    // Case 1:
+    // Session explicitly contains selected students
+
+    if (
+      Array.isArray(session.selectedStudents) &&
+      session.selectedStudents.length > 0
+    ) {
+      studentAllowed =
+        session.selectedStudents.some(
+          (id) =>
+            id.toString() ===
+            student._id.toString()
+        );
+    }
+
+    // Case 2:
+    // Session allows all students
+    else if (
+      session.studentSelectionMode === "all"
+    ) {
+      studentAllowed = true;
+    }
+
+    if (!studentAllowed) {
+      return res.status(403).json({
+        success: false,
+        message:
+          "You are not allowed to participate in this viva.",
+      });
+    }
+
+    // --------------------------------------------------
+    // Optional name verification
+    // --------------------------------------------------
+
+    if (
+      studentName &&
+      studentName.trim() &&
+      student.name
+    ) {
+      const enteredName =
+        studentName.trim().toLowerCase();
+
+      const actualName =
+        student.name.trim().toLowerCase();
+
+      if (enteredName !== actualName) {
+        return res.status(403).json({
           success: false,
           message:
-            "Viva session not found.",
+            "Student name does not match the enrollment number.",
         });
       }
+    }
 
-      const index =
-        Number(questionNumber) - 1;
+    // --------------------------------------------------
+    // IMPORTANT
+    //
+    // Do NOT send marks/questions/answers here.
+    // Student should only receive safe session data.
+    // --------------------------------------------------
 
-      if (
-        !Number.isInteger(index) ||
-        index < 0
-      ) {
-        return res.status(400).json({
-          success: false,
-          message:
-            "Invalid question number.",
-        });
+    return res.status(200).json({
+      success: true,
+      message:
+        "Student verified successfully.",
+
+      student: {
+        id: student._id,
+        enrollmentNumber:
+          student.enrollmentNumber,
+        name: student.name,
+      },
+
+      session: {
+        sessionId: session.sessionId,
+        status: session.status,
+        studentsPerViva:
+          session.studentsPerViva,
+        numberOfQuestions:
+          session.numberOfQuestions,
+        difficulty: session.difficulty,
+        questionType:
+          session.questionType,
+        timeLimit: session.timeLimit,
+        timeMode: session.timeMode,
+        language: session.language,
+      },
+    });
+  } catch (error) {
+    console.error(
+      "Student Join Viva Error:",
+      error
+    );
+
+    return res.status(500).json({
+      success: false,
+      message:
+        "Unable to join viva session.",
+      error: error.message,
+    });
+  }
+};
+
+// ======================================================
+// Start Viva Session
+// POST /api/viva-sessions/:sessionId/start
+// ======================================================
+
+const startVivaSession = async (req, res) => {
+  try {
+    const { sessionId } = req.params;
+
+    if (!sessionId || !sessionId.trim()) {
+      return res.status(400).json({
+        success: false,
+        message: "Viva session ID is required.",
+      });
+    }
+
+    const VivaSession = require("../models/VivaSession");
+
+    const session = await VivaSession.findOne({
+      sessionId: sessionId.trim(),
+    });
+
+    if (!session) {
+      return res.status(404).json({
+        success: false,
+        message: "Viva session not found.",
+      });
+    }
+
+    // --------------------------------------------------
+    // Cannot start cancelled/completed session
+    // --------------------------------------------------
+
+    if (session.status === "Cancelled") {
+      return res.status(400).json({
+        success: false,
+        message: "This viva session has been cancelled.",
+      });
+    }
+
+    if (session.status === "Completed") {
+      return res.status(400).json({
+        success: false,
+        message: "This viva session has already been completed.",
+      });
+    }
+
+    // --------------------------------------------------
+    // Start session only once
+    // --------------------------------------------------
+
+    if (session.status !== "Active") {
+      session.status = "Active";
+
+      if (!session.startedAt) {
+        session.startedAt = new Date();
       }
 
-      const question =
-        session.questions?.[index];
+      await session.save();
+    }
 
-      if (!question) {
-        return res.status(404).json({
-          success: false,
-          message:
-            "Viva question not found.",
-        });
-      }
+    // --------------------------------------------------
+    // IMPORTANT:
+    // Do NOT return questions or marks here.
+    // --------------------------------------------------
 
-      return res.status(200).json({
-        success: true,
+    return res.status(200).json({
+      success: true,
+      message: "Viva is ready to start.",
 
-        question: {
-          id:
-            question._id ||
-            null,
+      session: {
+        sessionId: session.sessionId,
+        status: session.status,
+        numberOfQuestions: session.numberOfQuestions,
+        difficulty: session.difficulty,
+        questionType: session.questionType,
+        timeLimit: session.timeLimit,
+        timeMode: session.timeMode,
+        language: session.language,
+        studentsPerViva: session.studentsPerViva,
+        rules: session.rules,
+        aiSettings: session.aiSettings,
+      },
+    });
+  } catch (error) {
+    console.error(
+      "Start Viva Session Error:",
+      error
+    );
 
-          questionId:
-            question.questionId ||
-            null,
+    return res.status(500).json({
+      success: false,
+      message: "Unable to start viva session.",
+      error: error.message,
+    });
+  }
+};
+// ======================================================
+// Get Next Viva Question
+// GET /api/viva-sessions/:sessionId/question/:questionNumber
+// ======================================================
 
-          question:
-            question.question,
+const getNextVivaQuestion = async (req, res) => {
+  try {
+    const { sessionId, questionNumber } = req.params;
 
-          difficulty:
-            question.difficulty,
+    const number = Number(questionNumber);
 
-          questionNumber:
-            index + 1,
+    if (!sessionId || !sessionId.trim()) {
+      return res.status(400).json({
+        success: false,
+        message: "Viva session ID is required.",
+      });
+    }
 
-          totalQuestions:
-            session.questions.length,
-        },
+    if (!Number.isInteger(number) || number < 1) {
+      return res.status(400).json({
+        success: false,
+        message: "Invalid question number.",
+      });
+    }
+
+    const VivaSession = require("../models/VivaSession");
+
+    const session = await VivaSession.findOne({
+      sessionId: sessionId.trim(),
+    });
+
+    if (!session) {
+      return res.status(404).json({
+        success: false,
+        message: "Viva session not found.",
+      });
+    }
+
+    if (session.status === "Cancelled") {
+      return res.status(400).json({
+        success: false,
+        message: "This viva session has been cancelled.",
+      });
+    }
+
+    if (session.status === "Completed") {
+      return res.status(400).json({
+        success: false,
+        message: "This viva session has already completed.",
+      });
+    }
+
+    if (session.status !== "Active") {
+      return res.status(400).json({
+        success: false,
+        message: "Viva session is not active.",
+      });
+    }
+
+    if (number > session.numberOfQuestions) {
+      return res.status(400).json({
+        success: false,
+        message: "No more questions are available.",
+      });
+    }
+
+    // --------------------------------------------------
+    // Find generated questions
+    // --------------------------------------------------
+
+    const Question = require("../models/Question");
+
+    const questionDocuments = await Question.find({
+      vivaSession: session._id,
+    }).sort({
+      createdAt: 1,
+    });
+
+    if (
+      !questionDocuments ||
+      questionDocuments.length === 0
+    ) {
+      return res.status(404).json({
+        success: false,
+        message:
+          "No generated questions found for this viva.",
+      });
+    }
+
+    if (number > questionDocuments.length) {
+      return res.status(400).json({
+        success: false,
+        message:
+          "Requested question is not available.",
+      });
+    }
+
+    const selectedQuestion =
+      questionDocuments[number - 1];
+
+    // --------------------------------------------------
+    // IMPORTANT
+    //
+    // Only send the current question.
+    // Never send answer/marks/evaluation.
+    // --------------------------------------------------
+
+    return res.status(200).json({
+      success: true,
+
+      question: {
+        id: selectedQuestion._id,
+        questionNumber: number,
+        totalQuestions: session.numberOfQuestions,
+        question:
+          selectedQuestion.question,
+        difficulty:
+          selectedQuestion.difficulty,
+      },
+    });
+  } catch (error) {
+    console.error(
+      "Get Viva Question Error:",
+      error
+    );
+
+    return res.status(500).json({
+      success: false,
+      message:
+        "Unable to load viva question.",
+      error: error.message,
+    });
+  }
+};
+
+// =====================================================
+// GET PUBLIC VIVA SESSION
+// =====================================================
+
+const getPublicVivaSession = async (req, res) => {
+  try {
+    const { sessionId } = req.params;
+
+    if (!sessionId) {
+      return res.status(400).json({
+        success: false,
+        message: "Viva session ID is required.",
+      });
+    }
+
+    const session = await VivaSession.findOne({
+      sessionId,
+    })
+      .populate("subject")
+      .populate("class")
+      .populate("department");
+
+    if (!session) {
+      return res.status(404).json({
+        success: false,
+        message: "Viva session not found.",
+      });
+    }
+
+    if (
+      session.status === "Completed" ||
+      session.status === "Cancelled"
+    ) {
+      return res.status(400).json({
+        success: false,
+        message: "This Viva session is no longer available.",
+      });
+    }
+
+    return res.status(200).json({
+      success: true,
+
+      session: {
+        sessionId: session.sessionId,
+
+        subject: session.subject,
+
+        class: session.class,
+
+        department: session.department,
+
+        studentsPerViva:
+          session.studentsPerViva,
+
+        numberOfQuestions:
+          session.numberOfQuestions,
+
+        difficulty: session.difficulty,
+
+        questionType:
+          session.questionType,
+
+        timeLimit:
+          session.timeLimit,
+
+        timeMode:
+          session.timeMode,
+
+        language:
+          session.language,
+
+        rules:
+          session.rules,
 
         aiSettings:
           session.aiSettings,
 
-        language:
-          session.language,
-      });
-    } catch (error) {
-      console.error(
-        "getNextVivaQuestion Error:",
-        error
-      );
+        status:
+          session.status,
+      },
+    });
+  } catch (error) {
+    console.error(
+      "getPublicVivaSession Error:",
+      error
+    );
 
-      return res.status(500).json({
-        success: false,
-        message:
-          "Unable to load Viva question.",
-      });
-    }
-  };
+    return res.status(500).json({
+      success: false,
+      message: "Unable to load Viva session.",
+    });
+  }
+};
 
-// ======================================================
-// PUBLIC VIVA SESSION
-// ======================================================
-
-const getPublicVivaSession =
-  async (req, res) => {
-    try {
-      const { sessionId } =
-        req.params;
-
-      const session =
-        await VivaSession.findOne({
-          sessionId,
-        }).lean();
-
-      if (!session) {
-        return res.status(404).json({
-          success: false,
-          message:
-            "Viva session not found.",
-        });
-      }
-
-      if (
-        session.status ===
-          "Cancelled" ||
-        session.status ===
-          "Completed"
-      ) {
-        return res.status(400).json({
-          success: false,
-          message:
-            "This Viva session is no longer available.",
-        });
-      }
-
-      return res.status(200).json({
-        success: true,
-
-        session: {
-          sessionId:
-            session.sessionId,
-
-          subject:
-            session.subject,
-
-          class:
-            session.class,
-
-          department:
-            session.department,
-
-          numberOfQuestions:
-            session.numberOfQuestions,
-
-          difficulty:
-            session.difficulty,
-
-          questionType:
-            session.questionType,
-
-          timeLimit:
-            session.timeLimit,
-
-          timeMode:
-            session.timeMode,
-
-          language:
-            session.language,
-
-          aiSettings: {
-            voice:
-              session.aiSettings
-                ?.voice ||
-              "Female",
-
-            speechSpeed:
-              session.aiSettings
-                ?.speechSpeed ||
-              "Normal",
-
-            personality:
-              session.aiSettings
-                ?.personality ||
-              "Professional",
-          },
-
-          status:
-            session.status,
-        },
-      });
-    } catch (error) {
-      console.error(
-        "getPublicVivaSession Error:",
-        error
-      );
-
-      return res.status(500).json({
-        success: false,
-        message:
-          "Unable to load Viva session.",
-      });
-    }
-  };
-
-// ======================================================
+// =====================================================
 // START PUBLIC VIVA
-// ======================================================
+// =====================================================
 
-const startPublicViva =
-  async (req, res) => {
-    try {
-      const { sessionId } =
-        req.params;
+const startPublicViva = async (req, res) => {
+  try {
+    const { sessionId } = req.params;
 
-      const {
-        attemptId,
-      } = req.body || {};
+    const {
+      studentName,
+      enrollmentNo,
+    } = req.body;
 
-      if (
-        !attemptId ||
-        !mongoose.Types.ObjectId.isValid(
-          attemptId
-        )
-      ) {
-        return res.status(400).json({
-          success: false,
-          message:
-            "Valid attempt ID is required.",
-        });
-      }
-
-      const session =
-        await VivaSession.findOne({
-          sessionId,
-        });
-
-      if (!session) {
-        return res.status(404).json({
-          success: false,
-          message:
-            "Viva session not found.",
-        });
-      }
-
-      if (
-        session.status !==
-        "Active"
-      ) {
-        return res.status(400).json({
-          success: false,
-          message:
-            "This Viva is not active.",
-        });
-      }
-
-      const attempt =
-        await VivaAttempt.findOne({
-          _id:
-            attemptId,
-
-          vivaSession:
-            session._id,
-        });
-
-      if (!attempt) {
-        return res.status(404).json({
-          success: false,
-          message:
-            "Viva attempt not found.",
-        });
-      }
-
-      if (
-        attempt.status ===
-        "Completed"
-      ) {
-        return res.status(400).json({
-          success: false,
-          message:
-            "This Viva attempt is already completed.",
-        });
-      }
-
-      if (
-        attempt.status ===
-        "Cancelled"
-      ) {
-        return res.status(400).json({
-          success: false,
-          message:
-            "This Viva attempt has been cancelled.",
-        });
-      }
-
-      if (
-        attempt.status !==
-        "Active"
-      ) {
-        attempt.status =
-          "Active";
-
-        attempt.startedAt =
-          new Date();
-
-        attempt.currentQuestionIndex =
-          0;
-
-        await attempt.save();
-      }
-
-      return res.status(200).json({
-        success: true,
-
-        message:
-          "Viva started successfully.",
-
-        attempt: {
-          attemptId:
-            attempt._id,
-
-          status:
-            attempt.status,
-
-          currentQuestionIndex:
-            attempt.currentQuestionIndex,
-
-          startedAt:
-            attempt.startedAt,
-        },
-      });
-    } catch (error) {
-      console.error(
-        "startPublicViva Error:",
-        error
-      );
-
-      return res.status(500).json({
+    if (!studentName?.trim()) {
+      return res.status(400).json({
         success: false,
-        message:
-          "Unable to start Viva.",
+        message: "Student name is required.",
       });
     }
-  };
 
-// ======================================================
-// SUBMIT PUBLIC VIVA ANSWER
-// ======================================================
-
-const submitPublicVivaAnswer =
-  async (req, res) => {
-    try {
-      const { sessionId } =
-        req.params;
-
-      const {
-        attemptId,
-        enrollmentNo,
-        questionId,
-        question,
-        answer,
-        questionNumber,
-      } = req.body || {};
-
-      // =================================================
-      // BASIC VALIDATION
-      // =================================================
-
-      const cleanSessionId =
-        String(
-          sessionId || ""
-        ).trim();
-
-      const cleanEnrollmentNo =
-        String(
-          enrollmentNo || ""
-        ).trim();
-
-      const cleanAnswer =
-        String(
-          answer || ""
-        ).trim();
-
-      const cleanQuestion =
-        String(
-          question || ""
-        ).trim();
-
-      const parsedQuestionNumber =
-        Number(questionNumber);
-
-      if (!cleanSessionId) {
-        return res.status(400).json({
-          success: false,
-          message:
-            "Viva session ID is required.",
-        });
-      }
-
-      if (
-        !attemptId ||
-        !mongoose.Types.ObjectId.isValid(
-          attemptId
-        )
-      ) {
-        return res.status(400).json({
-          success: false,
-          message:
-            "Valid Viva attempt ID is required.",
-        });
-      }
-
-      if (!cleanEnrollmentNo) {
-        return res.status(400).json({
-          success: false,
-          message:
-            "Enrollment number is required.",
-        });
-      }
-
-      if (!cleanAnswer) {
-        return res.status(400).json({
-          success: false,
-          message:
-            "Answer cannot be empty.",
-        });
-      }
-
-      if (
-        !Number.isInteger(
-          parsedQuestionNumber
-        ) ||
-        parsedQuestionNumber < 1
-      ) {
-        return res.status(400).json({
-          success: false,
-          message:
-            "Valid question number is required.",
-        });
-      }
-
-      // =================================================
-      // SESSION VALIDATION
-      // =================================================
-
-      const session =
-        await VivaSession.findOne({
-          sessionId:
-            cleanSessionId,
-        });
-
-      if (!session) {
-        return res.status(404).json({
-          success: false,
-          message:
-            "Viva session not found.",
-        });
-      }
-
-      if (
-        session.status ===
-        "Cancelled"
-      ) {
-        return res.status(400).json({
-          success: false,
-          message:
-            "This Viva session has been cancelled.",
-        });
-      }
-
-      if (
-        session.status ===
-        "Completed"
-      ) {
-        return res.status(400).json({
-          success: false,
-          message:
-            "This Viva session has already been completed.",
-        });
-      }
-
-      if (
-        session.status !==
-        "Active"
-      ) {
-        return res.status(400).json({
-          success: false,
-          message:
-            "Viva session is not active.",
-        });
-      }
-
-      // =================================================
-      // ATTEMPT VALIDATION
-      // =================================================
-
-      const attempt =
-        await VivaAttempt.findOne({
-          _id:
-            attemptId,
-
-          vivaSession:
-            session._id,
-        });
-
-      if (!attempt) {
-        return res.status(404).json({
-          success: false,
-          message:
-            "Viva attempt not found.",
-        });
-      }
-
-      if (
-        attempt.status !==
-        "Active"
-      ) {
-        return res.status(400).json({
-          success: false,
-          message:
-            "Viva attempt is not active.",
-        });
-      }
-
-      // =================================================
-      // STUDENT VALIDATION
-      // =================================================
-
-      const student =
-        await Student.findOne({
-          $or: [
-            {
-              enrollmentNumber:
-                cleanEnrollmentNo,
-            },
-            {
-              enrollmentNo:
-                cleanEnrollmentNo,
-            },
-            {
-              enrollment:
-                cleanEnrollmentNo,
-            },
-          ],
-        });
-
-      if (!student) {
-        return res.status(404).json({
-          success: false,
-          message:
-            "Student was not found.",
-        });
-      }
-
-      // =================================================
-      // ATTEMPT OWNERSHIP
-      // =================================================
-
-      if (
-        String(
-          attempt.student
-        ) !==
-        String(
-          student._id
-        )
-      ) {
-        return res.status(403).json({
-          success: false,
-          message:
-            "This student is not authorized to submit this Viva answer.",
-        });
-      }
-
-      // =================================================
-      // CLASS VALIDATION
-      // =================================================
-
-      if (
-        student.class &&
-        session.class &&
-        String(
-          student.class
-        ) !==
-        String(
-          session.class
-        )
-      ) {
-        return res.status(403).json({
-          success: false,
-          message:
-            "This student does not belong to this Viva class.",
-        });
-      }
-
-      // =================================================
-      // CURRENT QUESTION VALIDATION
-      // =================================================
-
-      const expectedQuestionNumber =
-        Number(
-          attempt.currentQuestionIndex ||
-            0
-        ) + 1;
-
-      if (
-        parsedQuestionNumber !==
-        expectedQuestionNumber
-      ) {
-        return res.status(409).json({
-          success: false,
-
-          code:
-            "QUESTION_SEQUENCE_MISMATCH",
-
-          message:
-            "This is not the current Viva question.",
-
-          currentQuestionNumber:
-            expectedQuestionNumber,
-        });
-      }
-
-      // =================================================
-      // SERVER-SIDE QUESTION
-      // =================================================
-
-      const sessionQuestions =
-        Array.isArray(
-          session.questions
-        )
-          ? session.questions
-          : [];
-
-      const actualQuestion =
-        sessionQuestions[
-          parsedQuestionNumber - 1
-        ];
-
-      if (!actualQuestion) {
-        return res.status(400).json({
-          success: false,
-          message:
-            "The submitted question does not exist in this Viva.",
-        });
-      }
-
-      const actualQuestionText =
-        String(
-          actualQuestion.question ||
-            ""
-        ).trim();
-
-      if (!actualQuestionText) {
-        return res.status(400).json({
-          success: false,
-          message:
-            "The Viva question is invalid.",
-        });
-      }
-
-      // =================================================
-      // QUESTION ID VALIDATION
-      // =================================================
-
-      if (
-        questionId &&
-        actualQuestion.questionId &&
-        String(questionId) !==
-          String(
-            actualQuestion.questionId
-          )
-      ) {
-        return res.status(403).json({
-          success: false,
-          message:
-            "Question validation failed.",
-        });
-      }
-
-      // =================================================
-      // QUESTION TEXT VALIDATION
-      // =================================================
-
-      if (
-        cleanQuestion &&
-        cleanQuestion !==
-          actualQuestionText
-      ) {
-        return res.status(403).json({
-          success: false,
-          message:
-            "Question validation failed.",
-        });
-      }
-
-      // =================================================
-      // DUPLICATE ANSWER PROTECTION
-      // =================================================
-
-      const answers =
-        Array.isArray(
-          attempt.answers
-        )
-          ? attempt.answers
-          : [];
-
-      const existingAnswer =
-        answers.find(
-          (item) =>
-            Number(
-              item.questionNumber
-            ) ===
-            parsedQuestionNumber
-        );
-
-      if (existingAnswer) {
-        return res.status(409).json({
-          success: false,
-
-          code:
-            "ANSWER_ALREADY_SUBMITTED",
-
-          message:
-            "This question has already been answered.",
-        });
-      }
-
-      // =================================================
-      // SAVE ANSWER
-      // =================================================
-
-      if (
-        !Array.isArray(
-          attempt.answers
-        )
-      ) {
-        attempt.answers = [];
-      }
-
-      attempt.answers.push({
-        questionId:
-          actualQuestion.questionId ||
-          null,
-
-        questionNumber:
-          parsedQuestionNumber,
-
-        question:
-          actualQuestionText,
-
-        transcript:
-          cleanAnswer,
-
-        answeredAt:
-          new Date(),
-      });
-
-      // =================================================
-      // MOVE TO NEXT QUESTION
-      // =================================================
-
-      attempt.currentQuestionIndex =
-        parsedQuestionNumber;
-
-      await attempt.save();
-
-      // =================================================
-      // STUDENT-SAFE RESPONSE
-      // =================================================
-
-      return res.status(200).json({
-        success: true,
-
-        saved: true,
-
-        message:
-          "Answer saved successfully.",
-
-        nextQuestionIndex:
-          attempt.currentQuestionIndex,
-      });
-    } catch (error) {
-      console.error(
-        "submitPublicVivaAnswer Error:",
-        error
-      );
-
-      return res.status(500).json({
+    if (!enrollmentNo?.trim()) {
+      return res.status(400).json({
         success: false,
         message:
-          "Unable to save answer. Please try again.",
+          "Enrollment number is required.",
       });
     }
-  };
 
-// ======================================================
-// COMPLETE PUBLIC VIVA
-// ======================================================
+    const session =
+      await VivaSession.findOne({
+        sessionId,
+      });
 
-const completePublicViva =
-  async (req, res) => {
-    try {
-      const { sessionId } =
-        req.params;
+    if (!session) {
+      return res.status(404).json({
+        success: false,
+        message:
+          "Viva session not found.",
+      });
+    }
 
-      const {
-        attemptId,
-        enrollmentNo,
-      } = req.body || {};
+    if (
+      session.status === "Completed" ||
+      session.status === "Cancelled"
+    ) {
+      return res.status(400).json({
+        success: false,
+        message:
+          "This Viva session is closed.",
+      });
+    }
 
-      const cleanEnrollmentNo =
-        String(
-          enrollmentNo || ""
-        ).trim();
+    // =================================================
+    // Find Student
+    // =================================================
 
-      if (!sessionId) {
-        return res.status(400).json({
-          success: false,
-          message:
-            "Viva session ID is required.",
-        });
-      }
+    const cleanEnrollmentNo = String(enrollmentNo).trim();
+    let student = await Student.findOne({
+      $or: [
+        { enrollment: cleanEnrollmentNo },
+        { enrollmentNumber: cleanEnrollmentNo },
+        { enrollmentNo: cleanEnrollmentNo },
+      ],
+    });
 
-      if (!cleanEnrollmentNo) {
-        return res.status(400).json({
-          success: false,
-          message:
-            "Enrollment number is required.",
-        });
-      }
+    if (!student) {
+      return res.status(404).json({
+        success: false,
+        message:
+          "Enrollment number was not found in this Viva.",
+      });
+    }
 
-      const session =
-        await VivaSession.findOne({
-          sessionId:
-            String(
-              sessionId
-            ).trim(),
-        });
+    // =================================================
+    // Verify Student Belongs To Class
+    // =================================================
 
-      if (!session) {
-        return res.status(404).json({
-          success: false,
-          message:
-            "Viva session not found.",
-        });
-      }
+    const studentClass = student.class ? String(student.class) : String(student.classId || "");
+    const sessionClass = String(session.class);
 
-      // =================================================
-      // FIND STUDENT
-      // =================================================
+    if (
+      studentClass &&
+      sessionClass &&
+      studentClass !== sessionClass
+    ) {
+      return res.status(403).json({
+        success: false,
+        message:
+          "This student does not belong to this Viva class.",
+      });
+    }
 
-      const student =
-        await Student.findOne({
-          $or: [
-            {
-              enrollmentNumber:
-                cleanEnrollmentNo,
-            },
-            {
-              enrollmentNo:
-                cleanEnrollmentNo,
-            },
-            {
-              enrollment:
-                cleanEnrollmentNo,
-            },
-          ],
-        });
+    // =================================================
+    // Get Questions
+    // =================================================
 
-      if (!student) {
-        return res.status(404).json({
-          success: false,
-          message:
-            "Student not found.",
-        });
-      }
-
-      // =================================================
-      // FIND ATTEMPT
-      // =================================================
-
-      const attemptQuery = {
+    const questions =
+      await Question.find({
         vivaSession:
           session._id,
+      }).lean();
 
-        student:
-          student._id,
-      };
-
-      if (
-        attemptId &&
-        mongoose.Types.ObjectId.isValid(
-          attemptId
-        )
-      ) {
-        attemptQuery._id =
-          attemptId;
-      }
-
-      const attempt =
-        await VivaAttempt.findOne(
-          attemptQuery
-        );
-
-      if (!attempt) {
-        return res.status(404).json({
-          success: false,
-          message:
-            "Viva attempt not found.",
-        });
-      }
-
-      // =================================================
-      // VERIFY OWNERSHIP
-      // =================================================
-
-      if (
-        String(
-          attempt.student
-        ) !==
-        String(
-          student._id
-        )
-      ) {
-        return res.status(403).json({
-          success: false,
-          message:
-            "You are not authorized to complete this Viva.",
-        });
-      }
-
-      // =================================================
-      // ALREADY COMPLETED
-      // =================================================
-
-      if (
-        attempt.status ===
-        "Completed"
-      ) {
-        return res.status(200).json({
-          success: true,
-
-          completed: true,
-
-          message:
-            "Viva completed successfully.",
-        });
-      }
-
-      if (
-        attempt.status ===
-        "Cancelled"
-      ) {
-        return res.status(400).json({
-          success: false,
-          message:
-            "This Viva attempt has been cancelled.",
-        });
-      }
-
-      // =================================================
-      // COMPLETE ATTEMPT
-      // =================================================
-
-      attempt.status =
-        "Completed";
-
-      attempt.completedAt =
-        new Date();
-
-      await attempt.save();
-
-      // =================================================
-      // EXISTING AI EVALUATION
-      // =================================================
-
-      if (
-        typeof evaluateVivaAttempt ===
-        "function"
-      ) {
-        evaluateVivaAttempt(
-          attempt._id
-        )
-          .then(() => {
-            console.log(
-              `AI Evaluation completed for attempt: ${attempt._id}`
-            );
-          })
-          .catch((error) => {
-            console.error(
-              `AI Evaluation failed for attempt ${attempt._id}:`,
-              error.message
-            );
-          });
-      }
-
-      console.log(
-        `Viva completed: ${sessionId} / ${cleanEnrollmentNo}`
-      );
-
-      // =================================================
-      // STUDENT-SAFE RESPONSE
-      // =================================================
-
-      return res.status(200).json({
-        success: true,
-
-        completed: true,
-
-        message:
-          "Viva completed successfully.",
-      });
-    } catch (error) {
-      console.error(
-        "completePublicViva Error:",
-        error
-      );
-
-      return res.status(500).json({
+    if (!questions.length) {
+      return res.status(404).json({
         success: false,
         message:
-          "Unable to complete Viva.",
+          "No questions are available for this Viva.",
       });
     }
-  };
+
+    // Never send evaluation/marks to student.
+    const safeQuestions =
+      questions.map((question) => ({
+        _id: question._id,
+        id:
+          question.id ||
+          question._id.toString(),
+
+        question:
+          question.question,
+
+        difficulty:
+          question.difficulty,
+      }));
+
+    return res.status(200).json({
+      success: true,
+
+      student: {
+        name:
+          student.name ||
+          student.studentName ||
+          studentName.trim(),
+
+        enrollmentNo:
+          enrollmentNo.trim(),
+      },
+
+      questions: safeQuestions,
+    });
+  } catch (error) {
+    console.error(
+      "startPublicViva Error:",
+      error
+    );
+
+    return res.status(500).json({
+      success: false,
+      message:
+        "Unable to start Viva.",
+    });
+  }
+};
+
+// =====================================================
+// SUBMIT PUBLIC VIVA ANSWER
+// =====================================================
+
+const submitPublicVivaAnswer = async (
+  req,
+  res
+) => {
+  try {
+    const { sessionId } =
+      req.params;
+
+    const {
+      enrollmentNo,
+      questionId,
+      question,
+      answer,
+      questionNumber,
+    } = req.body;
+
+    if (!enrollmentNo) {
+      return res.status(400).json({
+        success: false,
+        message:
+          "Enrollment number is required.",
+      });
+    }
+
+    if (!answer?.trim()) {
+      return res.status(400).json({
+        success: false,
+        message:
+          "Answer cannot be empty.",
+      });
+    }
+
+    const session =
+      await VivaSession.findOne({
+        sessionId,
+      });
+
+    if (!session) {
+      return res.status(404).json({
+        success: false,
+        message:
+          "Viva session not found.",
+      });
+    }
+
+    // -------------------------------------------------
+    // IMPORTANT
+    // We intentionally store answer without sending
+    // marks/evaluation back to the student.
+    // -------------------------------------------------
+
+    const answerData = {
+      sessionId: session._id,
+
+      studentEnrollmentNo:
+        enrollmentNo.trim(),
+
+      questionId:
+        questionId || null,
+
+      question:
+        question || "",
+
+      answer:
+        answer.trim(),
+
+      questionNumber:
+        Number(questionNumber) || 0,
+
+      submittedAt:
+        new Date(),
+    };
+
+    /*
+      Phase 10.5 stores the answer.
+
+      Phase 10.6 will connect this to the
+      permanent VivaAnswer model + AI evaluation.
+    */
+
+    console.log(
+      "VIVA ANSWER RECEIVED:",
+      answerData
+    );
+
+    return res.status(200).json({
+      success: true,
+      message:
+        "Answer saved successfully.",
+    });
+  } catch (error) {
+    console.error(
+      "submitPublicVivaAnswer Error:",
+      error
+    );
+
+    return res.status(500).json({
+      success: false,
+      message:
+        "Unable to save answer.",
+    });
+  }
+};
+
+// =====================================================
+// COMPLETE PUBLIC VIVA
+// =====================================================
+
+const completePublicViva = async (
+  req,
+  res
+) => {
+  try {
+    const { sessionId } =
+      req.params;
+
+    const {
+      enrollmentNo,
+    } = req.body;
+
+    if (!enrollmentNo) {
+      return res.status(400).json({
+        success: false,
+        message:
+          "Enrollment number is required.",
+      });
+    }
+
+    const session =
+      await VivaSession.findOne({
+        sessionId,
+      });
+
+    if (!session) {
+      return res.status(404).json({
+        success: false,
+        message:
+          "Viva session not found.",
+      });
+    }
+
+    console.log(
+      `Viva completed: ${sessionId} / ${enrollmentNo}`
+    );
+
+    return res.status(200).json({
+      success: true,
+      message:
+        "Viva completed successfully.",
+    });
+  } catch (error) {
+    console.error(
+      "completePublicViva Error:",
+      error
+    );
+
+    return res.status(500).json({
+      success: false,
+      message:
+        "Unable to complete Viva.",
+    });
+  }
+};
+
 // ======================================================
-// EXPORT ALL CONTROLLERS
+// Teacher Trigger / Re-run AI Evaluation (Phase 13)
+// POST /api/viva-sessions/:sessionId/evaluate
 // ======================================================
+
+const evaluateSessionAttempts = async (req, res) => {
+  try {
+    const teacherId = getTeacherId(req);
+    const { sessionId } = req.params;
+
+    if (!teacherId) {
+      return res.status(401).json({
+        success: false,
+        message: "Authentication is required.",
+      });
+    }
+
+    const session = await VivaSession.findOne({
+      sessionId: sessionId.trim(),
+      teacher: teacherId,
+    });
+
+    if (!session) {
+      return res.status(404).json({
+        success: false,
+        message: "Viva session not found.",
+      });
+    }
+
+    const VivaAttempt = require("../models/VivaAttempt");
+    const { evaluateVivaAttempt } = require("../services/aiEvaluationService");
+
+    const attempts = await VivaAttempt.find({
+      vivaSession: session._id,
+      status: "Completed",
+    });
+
+    if (attempts.length === 0) {
+      return res.status(200).json({
+        success: true,
+        message: "No completed attempts found to evaluate.",
+        evaluatedCount: 0,
+      });
+    }
+
+    const results = [];
+    for (const attempt of attempts) {
+      const evalResult = await evaluateVivaAttempt(attempt._id);
+      results.push(evalResult);
+    }
+
+    return res.status(200).json({
+      success: true,
+      message: `Successfully evaluated ${results.length} student attempt(s).`,
+      evaluatedCount: results.length,
+      evaluations: results,
+    });
+  } catch (error) {
+    console.error("Evaluate Session Attempts Error:", error);
+    return res.status(500).json({
+      success: false,
+      message: "Failed to evaluate session attempts.",
+      error: error.message,
+    });
+  }
+};
 
 module.exports = {
-  // ====================================================
-  // Teacher Viva Session
-  // ====================================================
-
   createVivaSession,
   getVivaSession,
+  getTeacherVivaSessions,
+  getSessionAnalytics,
   getStudentVivaLink,
-
-  // ====================================================
-  // Student Viva
-  // ====================================================
-
   joinVivaSession,
   startVivaSession,
   getNextVivaQuestion,
-
-  // ====================================================
-  // Public Viva
-  // ====================================================
-
   getPublicVivaSession,
   startPublicViva,
-
-  // ====================================================
-  // Phase 11.7
-  // Student Answer Submission
-  // ====================================================
-
   submitPublicVivaAnswer,
-
-  // ====================================================
-  // Phase 10.8
-  // Viva Completion
-  // ====================================================
-
   completePublicViva,
+  evaluateSessionAttempts,
 };

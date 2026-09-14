@@ -72,4 +72,20 @@ export const getAssignedClasses = async () => {
   return response.data;
 };
 
+// ============================
+// Get Teacher Dashboard Stats
+// ============================
+
+export const getTeacherDashboardStats = async () => {
+  const token = localStorage.getItem("token");
+
+  const response = await API.get("/teacher/dashboard-stats", {
+    headers: {
+      Authorization: `Bearer ${token}`,
+    },
+  });
+
+  return response.data;
+};
+
 export default API;

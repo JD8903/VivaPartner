@@ -66,6 +66,18 @@ const vivaSessionSchema = new mongoose.Schema(
       required: true,
     },
 
+    topic: {
+      type: String,
+      default: "Viva Session",
+      trim: true,
+    },
+
+    studyMaterial: {
+      type: mongoose.Schema.Types.ObjectId,
+      ref: "StudyMaterial",
+      default: null,
+    },
+
     vivaConfiguration: {
       type: mongoose.Schema.Types.ObjectId,
       ref: "VivaConfiguration",
@@ -110,7 +122,8 @@ const vivaSessionSchema = new mongoose.Schema(
 
     numberOfQuestions: {
       type: Number,
-      enum: [5, 10, 15, 20],
+      min: 1,
+      max: 50,
       default: 5,
     },
 

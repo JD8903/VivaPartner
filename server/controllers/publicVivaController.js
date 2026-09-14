@@ -240,7 +240,10 @@ const joinPublicViva = async (
       });
     }
 
-    if (session.status !== "Active") {
+    if (
+      session.status !== "Active" &&
+      session.status !== "Configured"
+    ) {
       return res.status(400).json({
         success: false,
         message:
@@ -295,9 +298,14 @@ const joinPublicViva = async (
       // ALL STUDENTS OF CLASS
       // =================================================
 
+      const classIdStr = session.class ? session.class.toString() : "";
       const students =
         await Student.find({
-          class: session.class,
+          $or: [
+            { class: session.class },
+            { classId: classIdStr },
+            { classId: session.class },
+          ],
         }).lean();
 
       student =
@@ -519,12 +527,23 @@ const startPublicViva = async (
       });
     }
 
-    if (session.status !== "Active") {
+    if (
+      session.status !== "Active" &&
+      session.status !== "Configured"
+    ) {
       return res.status(400).json({
         success: false,
         message:
           "This Viva Session is not active.",
       });
+    }
+
+    if (session.status !== "Active") {
+      session.status = "Active";
+      if (!session.startedAt) {
+        session.startedAt = new Date();
+      }
+      await session.save();
     }
 
     const attempt =
@@ -1560,6 +1579,8 @@ const completePublicViva = async (
         )
       );
 
+    const allowSkip = session.rules?.allowSkip !== false;
+
     for (
       let i = 1;
       i <= totalQuestions;
@@ -1568,12 +1589,23 @@ const completePublicViva = async (
       if (
         !answeredNumbers.has(i)
       ) {
-        return res.status(400).json({
-          success: false,
-          code: "ANSWERS_INCOMPLETE",
-          message:
-            `Question ${i} has not been answered yet.`,
-        });
+        if (allowSkip) {
+          const qObj = questions[i - 1];
+          attempt.answers.push({
+            questionId: qObj?.questionId || null,
+            questionNumber: i,
+            question: qObj?.question || `Question ${i}`,
+            transcript: "[Unanswered / Skipped]",
+            answeredAt: new Date(),
+          });
+        } else {
+          return res.status(400).json({
+            success: false,
+            code: "ANSWERS_INCOMPLETE",
+            message:
+              `Question ${i} has not been answered yet.`,
+          });
+        }
       }
     }
 
@@ -1593,6 +1625,16 @@ const completePublicViva = async (
     attempt.evaluated = false;
 
     await attempt.save();
+
+    // Trigger background AI evaluation for teacher reports (Phase 13)
+    try {
+      const { evaluateVivaAttempt } = require("../services/aiEvaluationService");
+      evaluateVivaAttempt(attempt._id).catch((evalErr) => {
+        console.error("Background AI Evaluation Error:", evalErr);
+      });
+    } catch (e) {
+      console.error("Failed to trigger background evaluation:", e);
+    }
 
     // =================================================
     // SECURITY

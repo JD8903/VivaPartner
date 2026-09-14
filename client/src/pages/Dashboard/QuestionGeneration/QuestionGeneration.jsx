@@ -3,6 +3,7 @@ import { useNavigate } from "react-router-dom";
 
 import { generateQuestions } from "../../../services/aiApi";
 import { saveQuestionsToDB } from "../../../services/questionApi";
+import { createVivaSession } from "../../../services/vivaSessionApi";
 
 const QuestionGeneration = () => {
   const navigate = useNavigate();
@@ -44,6 +45,7 @@ const QuestionGeneration = () => {
 
   const getCurrentStudyMaterial = () => {
     const possibleKeys = [
+      "currentStudyMaterial",
       "studyMaterial",
       "studyMaterialDraft",
     ];
@@ -54,7 +56,8 @@ const QuestionGeneration = () => {
       if (
         data.topic ||
         data.fileName ||
-        data.filePath
+        data.filePath ||
+        data.extractedText
       ) {
         return data;
       }
@@ -90,41 +93,48 @@ const QuestionGeneration = () => {
 
   const getCurrentExtractedContent = () => {
     const contentParts = [];
+    const isValidText = (t) =>
+      typeof t === "string" &&
+      t.trim() &&
+      t.trim() !== "[object Object]";
 
-    const pdfText =
-      localStorage.getItem("pdfText") || "";
-
-    const docxText =
-      localStorage.getItem("docxText") || "";
-
-    const pptxText =
-      localStorage.getItem("pptxText") || "";
-
-    const txtText =
-      localStorage.getItem("txtText") || "";
-
-    if (pdfText.trim()) {
-      contentParts.push(
-        `PDF STUDY MATERIAL:\n${pdfText}`
-      );
+    // Check currentStudyMaterial directly first
+    const currentStudy = getStorageObject("currentStudyMaterial");
+    if (isValidText(currentStudy?.extractedText)) {
+      contentParts.push(currentStudy.extractedText.trim());
     }
 
-    if (docxText.trim()) {
-      contentParts.push(
-        `DOCX STUDY MATERIAL:\n${docxText}`
-      );
+    const pdfText = localStorage.getItem("pdfText") || "";
+    const docxText = localStorage.getItem("docxText") || "";
+    const pptxText = localStorage.getItem("pptxText") || "";
+    const txtText = localStorage.getItem("txtText") || "";
+
+    if (
+      isValidText(pdfText) &&
+      !contentParts.some((p) => p.includes(pdfText.trim().substring(0, 50)))
+    ) {
+      contentParts.push(`PDF STUDY MATERIAL:\n${pdfText.trim()}`);
     }
 
-    if (pptxText.trim()) {
-      contentParts.push(
-        `PPTX STUDY MATERIAL:\n${pptxText}`
-      );
+    if (
+      isValidText(docxText) &&
+      !contentParts.some((p) => p.includes(docxText.trim().substring(0, 50)))
+    ) {
+      contentParts.push(`DOCX STUDY MATERIAL:\n${docxText.trim()}`);
     }
 
-    if (txtText.trim()) {
-      contentParts.push(
-        `TXT STUDY MATERIAL:\n${txtText}`
-      );
+    if (
+      isValidText(pptxText) &&
+      !contentParts.some((p) => p.includes(pptxText.trim().substring(0, 50)))
+    ) {
+      contentParts.push(`PPTX STUDY MATERIAL:\n${pptxText.trim()}`);
+    }
+
+    if (
+      isValidText(txtText) &&
+      !contentParts.some((p) => p.includes(txtText.trim().substring(0, 50)))
+    ) {
+      contentParts.push(`TXT STUDY MATERIAL:\n${txtText.trim()}`);
     }
 
     return contentParts.join("\n\n");
@@ -144,10 +154,13 @@ const QuestionGeneration = () => {
       const study = getCurrentStudyMaterial();
       const viva = getVivaConfiguration();
 
-      const extractedContent =
-        getCurrentExtractedContent();
+      const extractedContent = getCurrentExtractedContent();
 
-      const topic = (study.topic || "").trim();
+      const topic =
+        typeof study.topic === "string" &&
+        study.topic.trim() !== "[object Object]"
+          ? study.topic.trim()
+          : "";
 
       // =================================================
       // Build CURRENT study content only
@@ -156,17 +169,14 @@ const QuestionGeneration = () => {
       const contentParts = [];
 
       if (topic) {
-        contentParts.push(
-          `CURRENT TOPIC:\n${topic}`
-        );
+        contentParts.push(`CURRENT TOPIC:\n${topic}`);
       }
 
       if (extractedContent.trim()) {
-        contentParts.push(extractedContent);
+        contentParts.push(extractedContent.trim());
       }
 
-      const studyContent =
-        contentParts.join("\n\n").trim();
+      const studyContent = contentParts.join("\n\n").trim();
 
       console.log(
         "========== CURRENT 9.6 STUDY CONTENT =========="
@@ -352,6 +362,25 @@ const QuestionGeneration = () => {
   };
 
   // =====================================================
+  // Edit Question Difficulty
+  // =====================================================
+
+  const editQuestionDifficulty = (id, newDifficulty) => {
+    setQuestions((previous) =>
+      previous.map((question) =>
+        question.id === id
+          ? {
+              ...question,
+              difficulty: newDifficulty,
+            }
+          : question
+      )
+    );
+
+    setSaved(false);
+  };
+
+  // =====================================================
   // Delete Question
   // =====================================================
 
@@ -518,30 +547,75 @@ const QuestionGeneration = () => {
   };
 
   // =====================================================
-  // Start Voice Viva
+  // Finalize & Create Viva Session (Phase 10)
   // =====================================================
 
-  const startVoiceViva = async () => {
+  const handleFinalizeAndCreateSession = async () => {
     if (questions.length === 0) {
       setError(
-        "Please generate questions before starting the voice viva."
+        "Please generate questions before creating the viva session."
       );
-
       return;
     }
 
-    const success = await saveQuestions();
+    try {
+      setSaving(true);
+      setError("");
 
-    if (!success) {
-      return;
+      const success = await saveQuestions();
+      if (!success) {
+        return;
+      }
+
+      const viva = getVivaConfiguration();
+      const selectedClass = getStorageObject("selectedClass");
+
+      const studentIds = (viva.selectedStudents || []).map((s) =>
+        typeof s === "object" ? s._id : s
+      ).filter(Boolean);
+
+      const payload = {
+        assignment: selectedClass?._id,
+        vivaConfigurationId: viva?._id || viva?.vivaConfigurationId,
+        questions,
+        selectedStudents: studentIds,
+        studentSelectionMode:
+          viva.studentSelectionMode || (studentIds.length > 0 ? "selected" : "all"),
+        numberOfQuestions: questions.length,
+        difficulty: viva.difficulty || "Medium",
+        questionType: viva.questionType || "Mixed",
+        timeLimit: viva.timeLimit || 5,
+        totalMarks: viva.totalMarks || 20,
+        language: viva.language || "English",
+        rules: viva.rules,
+        aiSettings: viva.aiSettings,
+      };
+
+      const response = await createVivaSession(payload);
+      const session =
+        response?.data?.session ||
+        response?.session;
+
+      if (!session || !session.sessionId) {
+        throw new Error(response?.message || "Failed to create Viva Session.");
+      }
+
+      localStorage.setItem("vivaSession", JSON.stringify(session));
+      localStorage.setItem("generatedQuestions", JSON.stringify(questions));
+
+      navigate(`/teacher/share-viva/${session.sessionId}`, {
+        state: { sessionId: session.sessionId },
+      });
+    } catch (err) {
+      console.error("Create Viva Session Error:", err);
+      setError(
+        err?.response?.data?.message ||
+          err?.message ||
+          "Failed to create Viva Session."
+      );
+    } finally {
+      setSaving(false);
     }
-
-    localStorage.setItem(
-      "generatedQuestions",
-      JSON.stringify(questions)
-    );
-
-    navigate("/teacher/voice-viva");
   };
 
   // =====================================================
@@ -800,19 +874,33 @@ const QuestionGeneration = () => {
                 Question {question.id}
               </h3>
 
-              <span
-                style={{
-                  padding: "6px 13px",
-                  borderRadius: "20px",
-                  background: "#eff6ff",
-                  color: "#2563eb",
-                  fontSize: "13px",
-                  fontWeight: "700",
-                }}
-              >
-                {question.difficulty ||
-                  "Medium"}
-              </span>
+              <div style={{ display: "flex", alignItems: "center", gap: "8px" }}>
+                <span style={{ fontSize: "13px", color: "#64748b", fontWeight: "600" }}>Difficulty:</span>
+                <select
+                  value={question.difficulty || "Medium"}
+                  onChange={(event) =>
+                    editQuestionDifficulty(
+                      question.id,
+                      event.target.value
+                    )
+                  }
+                  style={{
+                    padding: "5px 12px",
+                    borderRadius: "16px",
+                    border: "1px solid #bfdbfe",
+                    background: "#eff6ff",
+                    color: "#2563eb",
+                    fontSize: "13px",
+                    fontWeight: "700",
+                    cursor: "pointer",
+                    outline: "none",
+                  }}
+                >
+                  <option value="Easy">Easy</option>
+                  <option value="Medium">Medium</option>
+                  <option value="Hard">Hard</option>
+                </select>
+              </div>
             </div>
 
             <textarea
@@ -997,7 +1085,7 @@ const QuestionGeneration = () => {
 
         <button
           type="button"
-          onClick={startVoiceViva}
+          onClick={handleFinalizeAndCreateSession}
           disabled={
             saving || questions.length === 0
           }
@@ -1017,7 +1105,7 @@ const QuestionGeneration = () => {
             fontWeight: "600",
           }}
         >
-          ▶ Start Voice Viva
+          {saving ? "⏳ Finalizing..." : "🔗 Finalize & Generate Viva Link →"}
         </button>
       </div>
     </div>

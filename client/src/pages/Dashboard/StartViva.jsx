@@ -1,2637 +1,1573 @@
-import { useEffect, useRef, useState } from "react";
-import { useParams } from "react-router-dom";
+import { useEffect, useState } from "react";
+import { useNavigate } from "react-router-dom";
+import { createVivaConfiguration } from "../../services/vivaConfigurationApi";
+import "./StartViva.css";
 
-import {
-  getPublicVivaSession,
-  joinPublicViva,
-  startPublicViva,
-  getCurrentVivaQuestion,
-  submitPublicVivaAnswer,
-} from "../../services/publicVivaApi";
+const StartViva = () => {
+  const navigate = useNavigate();
 
-const StudentViva = () => {
-  const { sessionId } = useParams();
+  // ================================
+  // Class
+  // ================================
 
-  // =====================================================
-  // SESSION / ATTEMPT STATES
-  // =====================================================
+  const [selectedClass, setSelectedClass] = useState(null);
 
-  const [loading, setLoading] = useState(true);
-  const [joining, setJoining] = useState(false);
-  const [starting, setStarting] = useState(false);
-  const [questionLoading, setQuestionLoading] = useState(false);
-
-  const [session, setSession] = useState(null);
-  const [student, setStudent] = useState(null);
-  const [attempt, setAttempt] = useState(null);
-  const [currentQuestion, setCurrentQuestion] = useState(null);
-
-  const [vivaStarted, setVivaStarted] = useState(false);
-
-  const [enrollmentNumber, setEnrollmentNumber] =
-    useState("");
+  // ================================
+  // Feedback & Saving State
+  // ================================
 
   const [error, setError] = useState("");
+  const [successMessage, setSuccessMessage] = useState("");
+  const [saving, setSaving] = useState(false);
 
-  // =====================================================
-  // 10.7.3 SPEECH RECOGNITION
-  // =====================================================
+  // ================================
+  // Modal
+  // ================================
 
-  const [isListening, setIsListening] = useState(false);
+  const [showModal, setShowModal] = useState(false);
 
-  // =====================================================
-  // 11.5 VOICE ANSWER UI STATE
-  // =====================================================
+  // ================================
+  // 8.2 Target Students (Option A vs Option B)
+  // ================================
 
-  const [isSubmittingAnswer, setIsSubmittingAnswer] =
-    useState(false);
+  const [studentSelectionMode, setStudentSelectionMode] = useState("all");
+  const [selectedStudents, setSelectedStudents] = useState([]);
 
-  const [answerCaptured, setAnswerCaptured] =
-    useState(false);
+  // ================================
+  // 8.3 Students Per Viva
+  // ================================
 
-  const [voiceUiError, setVoiceUiError] =
-    useState("");
+  const [studentsPerViva, setStudentsPerViva] = useState(1);
 
-  // =====================================================
-  // 11.6 QUESTION -> SPEAK -> LISTEN FLOW
-  // =====================================================
+  // ================================
+  // 8.4 Number Of Questions
+  // ================================
 
-  const voiceCycleRef = useRef(0);
-  const submissionLockRef = useRef(false);
+  const [numberOfQuestions, setNumberOfQuestions] = useState(10);
 
+  // ================================
+  // 8.5 Difficulty
+  // ================================
 
-  const [transcript, setTranscript] =
-    useState("");
+  const [difficulty, setDifficulty] = useState("Medium");
 
-  const [interimTranscript, setInterimTranscript] =
-    useState("");
+  // ================================
+  // 8.6 Question Type
+  // ================================
 
-  // =====================================================
-  // 11.4 FINAL TRANSCRIPT / VALIDATION
-  // =====================================================
+  const [questionType, setQuestionType] = useState("Mixed");
 
-  const finalTranscriptRef = useRef("");
+  // ================================
+  // 8.7 Time Limit
+  // ================================
 
-  const [answerValidationError, setAnswerValidationError] =
-    useState("");
+  const [timeLimit, setTimeLimit] = useState(5);
 
-  const [speechSupported, setSpeechSupported] =
-    useState(true);
+  // ================================
+  // 8.8 Total Marks
+  // ================================
 
-  const recognitionRef = useRef(null);
+  const [totalMarks, setTotalMarks] = useState(20);
 
-  // =====================================================
-  // 10.7.4 TEXT TO SPEECH
-  // =====================================================
+  // ================================
+  // 8.9 Language
+  // ================================
 
-  const [isSpeaking, setIsSpeaking] =
-    useState(false);
+  const [language, setLanguage] = useState("English");
 
-  const [speechFinished, setSpeechFinished] =
-    useState(false);
+  // ================================
+  // 8.10 Viva Rules
+  // ================================
 
-  const [ttsSupported, setTtsSupported] =
-    useState(true);
+  const [randomQuestions, setRandomQuestions] = useState(true);
+  const [noRepeatedQuestions, setNoRepeatedQuestions] = useState(true);
+  const [allowSkip, setAllowSkip] = useState(true);
+  const [followUpQuestions, setFollowUpQuestions] = useState(true);
+  const [hintMode, setHintMode] = useState(false);
+  const [autoSave, setAutoSave] = useState(true);
 
-  // =====================================================
-  // 11.2 TEXT-TO-SPEECH CONTROL
-  // =====================================================
-  const speechUtteranceRef = useRef(null);
-  const speechRequestRef = useRef(0);
+  // ================================
+  // 8.11 AI Settings
+  // ================================
 
-  // =====================================================
-  // LOAD SESSION
-  // =====================================================
+  const [voice, setVoice] = useState("Female");
+  const [speechSpeed, setSpeechSpeed] = useState("Normal");
+  const [aiPersonality, setAiPersonality] = useState("Professional");
+
+  // ================================
+  // Load Selected Class & Students
+  // ================================
 
   useEffect(() => {
-    loadSession();
-  }, [sessionId]);
+    const storedClass = localStorage.getItem("selectedClass");
 
-  // =====================================================
-  // 11.3 MICROPHONE / SPEECH RECOGNITION
-  // =====================================================
-
-  useEffect(() => {
-    const SpeechRecognition =
-      window.SpeechRecognition ||
-      window.webkitSpeechRecognition;
-
-    if (!SpeechRecognition) {
-      setSpeechSupported(false);
-      recognitionRef.current = null;
-      return undefined;
+    if (!storedClass) {
+      navigate("/teacher/assigned-classes");
+      return;
     }
 
-    setSpeechSupported(true);
+    try {
+      const parsedClass = JSON.parse(storedClass);
+      setSelectedClass(parsedClass);
+    } catch (error) {
+      console.error("Failed to read selected class:", error);
+      localStorage.removeItem("selectedClass");
+      navigate("/teacher/assigned-classes");
+      return;
+    }
 
-    const recognition =
-      new SpeechRecognition();
-
-    recognition.continuous = true;
-    recognition.interimResults = true;
-
-    recognition.lang =
-      getSpeechLanguage(
-        session?.language
-      );
-
-    recognition.onstart = () => {
-      setIsListening(true);
-      setError("");
-      setAnswerValidationError("");
-    };
-
-    // =====================================================
-    // 11.4 SPEECH-TO-TEXT RESULT HANDLING
-    // =====================================================
-
-    recognition.onresult = (event) => {
-      let finalText = "";
-      let temporaryText = "";
-
-      for (
-        let i = event.resultIndex;
-        i < event.results.length;
-        i++
-      ) {
-        const result = event.results[i];
-        const text =
-          result?.[0]?.transcript || "";
-
-        if (result.isFinal) {
-          finalText += `${text} `;
-        } else {
-          temporaryText += text;
-        }
-      }
-
-      // Final transcript is permanently accumulated.
-      if (finalText.trim()) {
-        finalTranscriptRef.current =
-          `${finalTranscriptRef.current} ${finalText}`
-            .replace(/\\s+/g, " ")
-            .trim();
-
-        setTranscript(
-          finalTranscriptRef.current
-        );
-        setAnswerCaptured(true);
-        setVoiceUiError("");
-
-        setAnswerValidationError("");
-      }
-
-      // Interim speech is displayed immediately,
-      // but is not treated as the final answer yet.
-      setInterimTranscript(
-        temporaryText.trim()
-      );
-    };
-
-    recognition.onerror = (event) => {
-      console.error(
-        "Speech Recognition Error:",
-        event?.error
-      );
-
-      setIsListening(false);
-
-      switch (event?.error) {
-        case "not-allowed":
-        case "service-not-allowed":
-          setError(
-            "Microphone permission was denied. Please allow microphone access and try again."
-          );
-          break;
-
-        case "no-speech":
-          setError(
-            "No speech was detected. Please speak clearly."
-          );
-          break;
-
-        case "audio-capture":
-          setError(
-            "No microphone was detected. Please check your microphone."
-          );
-          break;
-
-        case "network":
-          setError(
-            "Speech recognition network error. Please check your internet connection and try again."
-          );
-          break;
-
-        case "aborted":
-          // Intentional stop: no error message.
-          break;
-
-        default:
-          setError(
-            "Speech recognition could not start. Please try again."
-          );
-      }
-    };
-
-    recognition.onend = () => {
-      setIsListening(false);
-      setInterimTranscript("");
-    };
-
-    recognitionRef.current = recognition;
-
-    return () => {
+    // Load selected students if any were chosen from StudentManagement
+    const storedStudents = localStorage.getItem("selectedStudents");
+    if (storedStudents) {
       try {
-        recognition.onstart = null;
-        recognition.onresult = null;
-        recognition.onerror = null;
-        recognition.onend = null;
-        recognition.stop();
+        const parsedStudents = JSON.parse(storedStudents);
+        if (Array.isArray(parsedStudents) && parsedStudents.length > 0) {
+          setSelectedStudents(parsedStudents);
+          setStudentSelectionMode("selected");
+        }
       } catch (err) {
-        // Recognition was already stopped.
+        console.error("Failed to parse selectedStudents:", err);
       }
+    }
+  }, [navigate]);
 
-      if (recognitionRef.current === recognition) {
-        recognitionRef.current = null;
-      }
-
-      setIsListening(false);
-    };
-  }, [session?.language]);
-
-  // =====================================================
-  // CHECK TEXT TO SPEECH SUPPORT
-  // =====================================================
+  // ================================
+  // Load Existing Configuration
+  // ================================
 
   useEffect(() => {
-    if (!("speechSynthesis" in window)) {
-      setTtsSupported(false);
+    const storedConfig = localStorage.getItem("vivaConfig");
+    if (!storedConfig) return;
+
+    try {
+      const config = JSON.parse(storedConfig);
+
+      if (config.studentSelectionMode) {
+        setStudentSelectionMode(config.studentSelectionMode);
+      }
+
+      if (Array.isArray(config.selectedStudents) && config.selectedStudents.length > 0) {
+        setSelectedStudents(config.selectedStudents);
+      }
+
+      if (config.studentsPerViva) {
+        setStudentsPerViva(Number(config.studentsPerViva));
+      }
+
+      if (config.numberOfQuestions) {
+        setNumberOfQuestions(Number(config.numberOfQuestions));
+      }
+
+      if (config.difficulty) {
+        setDifficulty(config.difficulty);
+      }
+
+      if (config.questionType) {
+        setQuestionType(config.questionType);
+      }
+
+      if (config.timeLimit) {
+        setTimeLimit(Number(config.timeLimit));
+      }
+
+      if (config.totalMarks) {
+        setTotalMarks(Number(config.totalMarks));
+      }
+
+      if (config.language) {
+        setLanguage(config.language);
+      }
+
+      // 8.10 Rules
+      if (typeof config.randomQuestions === "boolean") {
+        setRandomQuestions(config.randomQuestions);
+      }
+      if (typeof config.noRepeatedQuestions === "boolean") {
+        setNoRepeatedQuestions(config.noRepeatedQuestions);
+      }
+      if (typeof config.allowSkip === "boolean") {
+        setAllowSkip(config.allowSkip);
+      }
+      if (typeof config.followUpQuestions === "boolean") {
+        setFollowUpQuestions(config.followUpQuestions);
+      }
+      if (typeof config.hintMode === "boolean") {
+        setHintMode(config.hintMode);
+      }
+      if (typeof config.autoSave === "boolean") {
+        setAutoSave(config.autoSave);
+      }
+
+      // 8.11 AI Settings
+      if (config.voice) setVoice(config.voice);
+      if (config.speechSpeed) setSpeechSpeed(config.speechSpeed);
+      if (config.aiPersonality) setAiPersonality(config.aiPersonality);
+    } catch (error) {
+      console.error("Failed to load Viva configuration:", error);
     }
   }, []);
 
-  // =====================================================
-  // CHECK TEXT TO SPEECH SUPPORT
-  // =====================================================
-
-  useEffect(() => {
-    if (
-      typeof window === "undefined" ||
-      !("speechSynthesis" in window) ||
-      typeof window.SpeechSynthesisUtterance === "undefined"
-    ) {
-      setTtsSupported(false);
-      return;
-    }
-
-    setTtsSupported(true);
-
-    try {
-      window.speechSynthesis.getVoices();
-    } catch (error) {
-      console.warn("Unable to read browser TTS voices:", error);
-    }
-  }, []);
-
-  // =====================================================
-  // LOAD SESSION
-  // =====================================================
-
-  const loadSession = async () => {
-    try {
-      setLoading(true);
-      setError("");
-
-      if (!sessionId) {
-        setError(
-          "Invalid Viva link."
-        );
-        return;
+  // Remove individual student from selection
+  const handleRemoveStudent = (studentId) => {
+    setSelectedStudents((prev) => {
+      const updated = prev.filter((s) => (s._id || s) !== studentId);
+      if (updated.length === 0) {
+        setStudentSelectionMode("all");
       }
-
-      const response =
-        await getPublicVivaSession(
-          sessionId
-        );
-
-      if (
-        !response?.success ||
-        !response?.session
-      ) {
-        setError(
-          response?.message ||
-            "Unable to load Viva Session."
-        );
-        return;
-      }
-
-      setSession(
-        response.session
-      );
-
-      // =================================================
-      // RESTORE STUDENT
-      // =================================================
-
-      const savedStudent =
-        JSON.parse(
-          sessionStorage.getItem(
-            `vivaStudent_${sessionId}`
-          ) || "null"
-        );
-
-      const savedAttempt =
-        JSON.parse(
-          sessionStorage.getItem(
-            `vivaAttempt_${sessionId}`
-          ) || "null"
-        );
-
-      if (savedStudent) {
-        setStudent(
-          savedStudent
-        );
-      }
-
-      if (savedAttempt) {
-        setAttempt(
-          savedAttempt
-        );
-      }
-    } catch (err) {
-      console.error(
-        "Load Viva Session Error:",
-        err
-      );
-
-      setError(
-        err.message ||
-          "Unable to load Viva Session."
-      );
-    } finally {
-      setLoading(false);
-    }
-  };
-
-  // =====================================================
-  // LOAD CURRENT QUESTION
-  // =====================================================
-
-  const loadCurrentQuestion = async (
-    activeAttempt = attempt
-  ) => {
-    try {
-      if (
-        !activeAttempt?.attemptId
-      ) {
-        setError(
-          "Viva attempt was not found."
-        );
-        return;
-      }
-
-      setQuestionLoading(true);
-      setError("");
-
-      // Stop previous question voice
-      stopQuestionSpeech();
-
-      const response =
-        await getCurrentVivaQuestion(
-          sessionId,
-          activeAttempt.attemptId
-        );
-
-      if (
-        !response?.success
-      ) {
-        setError(
-          response?.message ||
-            "Unable to load question."
-        );
-        return;
-      }
-
-      if (
-        response.completed
-      ) {
-        setCurrentQuestion(
-          null
-        );
-
-        setVivaStarted(
-          false
-        );
-
-        return;
-      }
-
-      setCurrentQuestion(
-        response.question
-      );
-
-      // Reset answer for new question
-      finalTranscriptRef.current = "";
-      setTranscript("");
-      setInterimTranscript("");
-      setAnswerValidationError("");
-
-      setSpeechFinished(false);
-
-      setVivaStarted(
-        true
-      );
-    } catch (err) {
-      console.error(
-        "Load Current Question Error:",
-        err
-      );
-
-      setError(
-        err.message ||
-          "Unable to load current question."
-      );
-    } finally {
-      setQuestionLoading(
-        false
-      );
-    }
-  };
-
-  // =====================================================
-  // JOIN VIVA
-  // =====================================================
-
-  const handleJoin = async (e) => {
-    e.preventDefault();
-
-    if (
-      !enrollmentNumber.trim()
-    ) {
-      setError(
-        "Please enter your enrollment number."
-      );
-      return;
-    }
-
-    try {
-      setJoining(true);
-      setError("");
-
-      const response =
-        await joinPublicViva(
-          sessionId,
-          enrollmentNumber.trim()
-        );
-
-      if (
-        !response?.success
-      ) {
-        setError(
-          response?.message ||
-            "Unable to join Viva."
-        );
-        return;
-      }
-
-      const studentData =
-        response.student;
-
-      const attemptData =
-        response.attempt;
-
-      setStudent(
-        studentData
-      );
-
-      setAttempt(
-        attemptData
-      );
-
-      sessionStorage.setItem(
-        `vivaStudent_${sessionId}`,
-        JSON.stringify(
-          studentData
-        )
-      );
-
-      sessionStorage.setItem(
-        `vivaAttempt_${sessionId}`,
-        JSON.stringify(
-          attemptData
-        )
-      );
-    } catch (err) {
-      console.error(
-        "Join Viva Error:",
-        err
-      );
-
-      setError(
-        err.message ||
-          "Unable to join Viva."
-      );
-    } finally {
-      setJoining(false);
-    }
-  };
-
-  // =====================================================
-  // START VIVA
-  // =====================================================
-
-  const handleStart = async () => {
-    if (
-      !attempt?.attemptId
-    ) {
-      setError(
-        "Viva attempt was not found. Please join again."
-      );
-      return;
-    }
-
-    try {
-      setStarting(true);
-      setError("");
-
-      const response =
-        await startPublicViva(
-          sessionId,
-          attempt.attemptId
-        );
-
-      if (
-        !response?.success
-      ) {
-        setError(
-          response?.message ||
-            "Unable to start Viva."
-        );
-        return;
-      }
-
-      const updatedAttempt =
-        response.attempt;
-
-      setAttempt(
-        updatedAttempt
-      );
-
-      sessionStorage.setItem(
-        `vivaAttempt_${sessionId}`,
-        JSON.stringify(
-          updatedAttempt
-        )
-      );
-
-      await loadCurrentQuestion(
-        updatedAttempt
-      );
-    } catch (err) {
-      console.error(
-        "Start Viva Error:",
-        err
-      );
-
-      setError(
-        err.message ||
-          "Unable to start Viva."
-      );
-    } finally {
-      setStarting(false);
-    }
-  };
-
-  // =====================================================
-  // RESTORE ACTIVE ATTEMPT
-  // =====================================================
-
-  useEffect(() => {
-    if (
-      attempt?.status ===
-        "Active" &&
-      session?.status ===
-        "Active"
-    ) {
-      loadCurrentQuestion(
-        attempt
-      );
-    }
-  }, [
-    attempt?.attemptId,
-    attempt?.status,
-    session?.status,
-  ]);
-
-  // =====================================================
-  // 10.7.4 SPEAK QUESTION AUTOMATICALLY
-  // =====================================================
-
-  useEffect(() => {
-    if (
-      !currentQuestion?.question ||
-      !vivaStarted
-    ) {
-      return;
-    }
-
-    const timer =
-      setTimeout(() => {
-        speakQuestion(
-          currentQuestion.question
-        );
-      }, 600);
-
-    return () => {
-      clearTimeout(timer);
-      stopQuestionSpeech();
-    };
-  }, [
-    currentQuestion,
-    vivaStarted,
-  ]);
-
-  // =====================================================
-  // 11.2 TEXT-TO-SPEECH HELPERS
-  // =====================================================
-
-  const getPreferredVoice = (language, gender) => {
-    if (
-      typeof window === "undefined" ||
-      !("speechSynthesis" in window)
-    ) {
-      return null;
-    }
-
-    const voices = window.speechSynthesis.getVoices();
-
-    if (!voices || voices.length === 0) {
-      return null;
-    }
-
-    const languageCode = getSpeechLanguage(language).toLowerCase();
-    const languagePrefix = languageCode.split("-")[0];
-    const selectedGender = String(gender || "Female").toLowerCase();
-
-    const languageVoices = voices.filter((voice) => {
-      const voiceLanguage = String(voice.lang || "").toLowerCase();
-      return (
-        voiceLanguage === languageCode ||
-        voiceLanguage.startsWith(`${languagePrefix}-`)
-      );
+      localStorage.setItem("selectedStudents", JSON.stringify(updated));
+      return updated;
     });
-
-    const pool = languageVoices.length > 0 ? languageVoices : voices;
-
-    const genderVoice = pool.find((voice) => {
-      const name = String(voice.name || "").toLowerCase();
-
-      if (selectedGender === "male") {
-        return /male|man|david|mark|daniel|george|alex/.test(name);
-      }
-
-      return /female|woman|zira|samantha|victoria|susan|karen|hazel/.test(name);
-    });
-
-    return genderVoice || pool[0] || null;
   };
 
-  const speakQuestion = (questionText) => {
-    if (!questionText || !String(questionText).trim()) {
-      return;
-    }
+  // ================================
+  // Validate Configuration
+  // ================================
 
-    if (
-      typeof window === "undefined" ||
-      !("speechSynthesis" in window) ||
-      typeof window.SpeechSynthesisUtterance === "undefined"
-    ) {
-      setTtsSupported(false);
-      setIsSpeaking(false);
-      setSpeechFinished(false);
-      setError(
-        "Text-to-speech is not supported in this browser. You can still read the question and answer manually."
-      );
-      return;
-    }
-
-    const requestId = ++speechRequestRef.current;
-
-    try {
-      window.speechSynthesis.cancel();
-    } catch (error) {
-      console.warn("Unable to cancel previous speech:", error);
-    }
-
-    setIsSpeaking(true);
-    setSpeechFinished(false);
+  const validateConfiguration = () => {
     setError("");
 
-    const utterance = new window.SpeechSynthesisUtterance(
-      String(questionText).trim()
-    );
-
-    const language = session?.language || "English";
-    const selectedVoice = session?.aiSettings?.voice || "Female";
-    const speechSpeed = session?.aiSettings?.speechSpeed || "Normal";
-
-    utterance.lang = getSpeechLanguage(language);
-    utterance.rate = getSpeechRate(speechSpeed);
-    utterance.pitch = String(selectedVoice).toLowerCase() === "male" ? 0.95 : 1;
-    utterance.volume = 1;
-
-    const speak = () => {
-      if (requestId !== speechRequestRef.current) {
-        return;
-      }
-
-      const preferredVoice = getPreferredVoice(
-        language,
-        selectedVoice
-      );
-
-      if (preferredVoice) {
-        utterance.voice = preferredVoice;
-      }
-
-      speechUtteranceRef.current = utterance;
-
-      try {
-        window.speechSynthesis.speak(utterance);
-      } catch (error) {
-        console.error("Text-to-Speech Start Error:", error);
-        speechUtteranceRef.current = null;
-        setIsSpeaking(false);
-        setSpeechFinished(false);
-        setError(
-          "Unable to speak the question. You can still read the question and answer manually."
-        );
-      }
-    };
-
-    utterance.onstart = () => {
-      if (requestId !== speechRequestRef.current) return;
-      setIsSpeaking(true);
-      setSpeechFinished(false);
-    };
-
-    utterance.onend = () => {
-      if (requestId !== speechRequestRef.current) return;
-      speechUtteranceRef.current = null;
-      setIsSpeaking(false);
-      setSpeechFinished(true);
-    };
-
-    utterance.onerror = (event) => {
-      if (requestId !== speechRequestRef.current) return;
-
-      // Browser cancellation is intentional when another question loads.
-      if (event?.error === "canceled" || event?.error === "interrupted") {
-        return;
-      }
-
-      console.error("Text-to-Speech Error:", event);
-      speechUtteranceRef.current = null;
-      setIsSpeaking(false);
-      setSpeechFinished(false);
-      setError(
-        "Unable to speak the question. You can still read the question and answer manually."
-      );
-    };
-
-    // Chrome/Edge may populate voices asynchronously. Give the browser a
-    // short opportunity to expose them, while still speaking even if no
-    // voice list is available.
-    const voicesReady = window.speechSynthesis.getVoices();
-
-    if (voicesReady.length > 0) {
-      speak();
-    } else {
-      const handleVoicesChanged = () => {
-        window.speechSynthesis.removeEventListener(
-          "voiceschanged",
-          handleVoicesChanged
-        );
-        speak();
-      };
-
-      window.speechSynthesis.addEventListener(
-        "voiceschanged",
-        handleVoicesChanged,
-        { once: true }
-      );
-
-      // Fallback in browsers that never fire voiceschanged.
-      window.setTimeout(() => {
-        window.speechSynthesis.removeEventListener(
-          "voiceschanged",
-          handleVoicesChanged
-        );
-        if (requestId === speechRequestRef.current && !speechUtteranceRef.current) {
-          speak();
-        }
-      }, 250);
-    }
-  };
-
-  // =====================================================
-  // STOP QUESTION SPEECH
-  // =====================================================
-
-  const stopQuestionSpeech = () => {
-    voiceCycleRef.current += 1;
-    speechRequestRef.current += 1;
-
-    if (
-      typeof window !== "undefined" &&
-      "speechSynthesis" in window
-    ) {
-      try {
-        window.speechSynthesis.cancel();
-      } catch (error) {
-        console.warn("Unable to stop question speech:", error);
-      }
-    }
-
-    speechUtteranceRef.current = null;
-    setIsSpeaking(false);
-  };
-
-  // =====================================================
-  // 11.3 START MICROPHONE
-  // =====================================================
-
-  const startListening = () => {
-    setError("");
-
-    const SpeechRecognition =
-      window.SpeechRecognition ||
-      window.webkitSpeechRecognition;
-
-    if (!SpeechRecognition) {
-      setSpeechSupported(false);
-
-      setError(
-        "Speech recognition is not supported in this browser. Please use Google Chrome or Microsoft Edge."
-      );
-
-      return;
-    }
-
-    const recognition = recognitionRef.current;
-
-    if (!recognition) {
-      setError(
-        "Speech recognition is not ready. Please refresh the page and try again."
-      );
-
-      return;
-    }
-
-    // Prevent multiple recording instances.
-    if (isListening) {
-      return;
-    }
-
-    // Invalidate any old voice cycle and stop AI speech before
-    // opening the microphone so AI audio is never captured.
-    voiceCycleRef.current += 1;
-    submissionLockRef.current = false;
-
-    if ("speechSynthesis" in window) {
-      window.speechSynthesis.cancel();
-    }
-
-    speechRequestRef.current += 1;
-    speechUtteranceRef.current = null;
-    setTtsStatus("idle");
-
-    // Never allow AI question audio to be captured
-    // as the student's answer.
-    stopQuestionSpeech();
-
-    // Start a clean answer for the current question.
-    finalTranscriptRef.current = "";
-    setTranscript("");
-    setInterimTranscript("");
-    setAnswerValidationError("");
-    setAnswerCaptured(false);
-    setVoiceUiError("");
-    submissionLockRef.current = false;
-
-    recognition.lang =
-      getSpeechLanguage(
-        session?.language
-      );
-
-    try {
-      recognition.start();
-    } catch (err) {
-      console.error(
-        "Start microphone error:",
-        err
-      );
-
-      if (
-        err?.name === "InvalidStateError"
-      ) {
-        setIsListening(true);
-        return;
-      }
-
-      setIsListening(false);
-
-      setError(
-        "Microphone could not be started. Please try again."
-      );
-    }
-  };
-
-  // =====================================================
-  // 11.5 VOICE ANSWER UI STATES
-  // =====================================================
-
-  const isAiSpeaking =
-    ttsStatus === "speaking";
-
-  const hasAnswer =
-    Boolean(
-      finalTranscriptRef.current?.trim() ||
-      transcript?.trim()
-    );
-
-  const voiceUiState =
-    isSubmittingAnswer
-      ? "submitting"
-      : error || voiceUiError
-      ? "error"
-      : isAiSpeaking
-      ? "ai-speaking"
-      : isListening
-      ? "listening"
-      : hasAnswer
-      ? "answer-captured"
-      : "ready";
-
-  const voiceUiLabel = {
-    "ai-speaking":
-      "🔊 AI is asking the question...",
-    listening:
-      "🔴 Listening... Speak your answer.",
-    "answer-captured":
-      "✅ Answer captured. Review your answer.",
-    submitting:
-      "⏳ Submitting your answer...",
-    error:
-      "⚠️ Something went wrong. Please try again.",
-    ready:
-      "🎙 Ready to answer.",
-  }[voiceUiState];
-
-  // =====================================================
-
-  // =====================================================
-  // 11.4 ANSWER VALIDATION
-  // =====================================================
-
-  const getAnswerText = () =>
-    finalTranscriptRef.current
-      .trim();
-
-  const validateAnswerTranscript = () => {
-    const answer =
-      getAnswerText();
-
-    if (!answer) {
-      setAnswerValidationError(
-        "Please answer the question before continuing."
-      );
-
-      setVoiceUiError(
-        "Please provide an answer before submitting."
-      );
-
-      setAnswerCaptured(false);
+    if (!selectedClass) {
+      setError("Please select an assigned class first.");
       return false;
     }
 
-    setAnswerValidationError("");
-    setVoiceUiError("");
-    setAnswerCaptured(true);
+    if (studentSelectionMode === "selected" && selectedStudents.length === 0) {
+      setError(
+        "Option A (Specific Students) is selected, but no students are selected. Please select at least one student or choose Option B (Entire Class)."
+      );
+      return false;
+    }
+
+    if (!numberOfQuestions || Number(numberOfQuestions) < 1) {
+      setError("Number of questions must be at least 1.");
+      return false;
+    }
+
+    if (!timeLimit || Number(timeLimit) < 1) {
+      setError("Time limit must be at least 1 minute.");
+      return false;
+    }
+
+    if (!totalMarks || Number(totalMarks) < 1) {
+      setError("Total marks must be greater than 0.");
+      return false;
+    }
+
     return true;
   };
 
-  // =====================================================
-  // 11.7 SUBMIT SPOKEN ANSWER TO BACKEND
-  // =====================================================
+  // ================================
+  // Get Configuration Payload
+  // ================================
 
-  const handleSubmitAnswerUI = async () => {
-    if (
-      isSubmittingAnswer ||
-      submissionLockRef.current
-    ) {
-      return;
-    }
+  const getPayload = () => {
+    const studentIds = selectedStudents
+      .map((s) => (typeof s === "object" ? s._id : s))
+      .filter(Boolean);
 
-    if (!sessionId) {
-      setVoiceUiError("Invalid Viva session.");
-      return;
-    }
+    const assignmentId = selectedClass?._id;
+    const classId =
+      selectedClass?.class?._id ||
+      selectedClass?.classId ||
+      selectedClass?.class;
 
-    if (!attempt?.attemptId) {
-      setVoiceUiError(
-        "Viva attempt was not found. Please join again."
-      );
-      return;
-    }
-
-    if (!currentQuestion) {
-      setVoiceUiError("No active Viva question.");
-      return;
-    }
-
-    if (isAiSpeaking) {
-      setVoiceUiError(
-        "Please wait until the AI finishes asking the question."
-      );
-      return;
-    }
-
-    if (isListening) {
-      setVoiceUiError(
-        "Please stop recording before submitting your answer."
-      );
-      return;
-    }
-
-    const finalAnswer =
-      finalTranscriptRef.current?.trim() ||
-      transcript?.trim() ||
-      "";
-
-    if (!finalAnswer) {
-      setAnswerValidationError(
-        "Please answer the question before continuing."
-      );
-      setVoiceUiError(
-        "Please provide an answer before submitting."
-      );
-      setAnswerCaptured(false);
-      return;
-    }
-
-    const cleanEnrollment =
-      student?.enrollmentNumber ||
-      student?.enrollmentNo ||
-      enrollmentNumber.trim();
-
-    if (!cleanEnrollment) {
-      setVoiceUiError(
-        "Student enrollment number was not found."
-      );
-      return;
-    }
-
-    submissionLockRef.current = true;
-    setIsSubmittingAnswer(true);
-    setVoiceUiError("");
-    setError("");
-
-    try {
-      stopListening();
-      stopQuestionSpeech();
-
-      const response =
-        await submitPublicVivaAnswer(
-          sessionId,
-          {
-            attemptId: attempt.attemptId,
-            enrollmentNo: cleanEnrollment,
-            questionId:
-              currentQuestion.id || null,
-            question:
-              currentQuestion.question || "",
-            answer: finalAnswer,
-            questionNumber:
-              Number(
-                currentQuestion.questionNumber
-              ) || 0,
-          }
-        );
-
-      if (!response?.success) {
-        throw new Error(
-          response?.message ||
-            "Unable to save your answer."
-        );
-      }
-
-      setAnswerCaptured(true);
-      setVoiceUiError("");
-
-      if (
-        response.nextQuestionIndex !==
-        undefined
-      ) {
-        const updatedAttempt = {
-          ...attempt,
-          currentQuestionIndex:
-            response.nextQuestionIndex,
-        };
-
-        setAttempt(updatedAttempt);
-
-        sessionStorage.setItem(
-          `vivaAttempt_${sessionId}`,
-          JSON.stringify(updatedAttempt)
-        );
-      }
-
-      // Phase 11.7 only persists the answer.
-      // Question navigation is handled separately.
-    } catch (err) {
-      console.error(
-        "Submit Viva Answer Error:",
-        err
-      );
-
-      setVoiceUiError(
-        err?.response?.data?.message ||
-          err?.message ||
-          "Unable to save your answer. Please try again."
-      );
-    } finally {
-      setIsSubmittingAnswer(false);
-      submissionLockRef.current = false;
-    }
-  };
-
-  // =====================================================
-  // 11.3 STOP MICROPHONE
-  // =====================================================
-
-  const stopListening = () => {
-    const recognition =
-      recognitionRef.current;
-
-    if (!recognition) {
-      setIsListening(false);
-      setInterimTranscript("");
-      validateAnswerTranscript();
-      return;
-    }
-
-    try {
-      recognition.stop();
-    } catch (err) {
-      console.error(
-        "Stop microphone error:",
-        err
-      );
-    }
-
-    setIsListening(false);
-    setInterimTranscript("");
-
-    // Validate only the final transcript.
-    validateAnswerTranscript();
-  };
-
-  // =====================================================
-  // CLEAR ANSWER
-  // =====================================================
-
-  const clearAnswer = () => {
-    if (isListening) {
-      stopListening();
-    }
-
-    finalTranscriptRef.current = "";
-    setTranscript("");
-    setInterimTranscript("");
-    setAnswerValidationError("");
-    setAnswerCaptured(false);
-    setVoiceUiError("");
-    setError("");
-  };
-
-  // =====================================================
-  // 11.3 CLEANUP ON PAGE EXIT
-  // =====================================================
-
-  useEffect(() => {
-    return () => {
-      speechRequestRef.current += 1;
-      speechUtteranceRef.current = null;
-      finalTranscriptRef.current = "";
-
-      if (
-        "speechSynthesis" in window
-      ) {
-        window.speechSynthesis.cancel();
-      }
-
-      try {
-        recognitionRef.current?.stop();
-      } catch (err) {
-        // Already stopped.
-      }
+    return {
+      assignmentId,
+      classId,
+      studentSelectionMode,
+      selectedStudents: studentSelectionMode === "selected" ? studentIds : [],
+      students: studentSelectionMode === "selected" ? studentIds : [],
+      studentsPerViva,
+      numberOfQuestions: Number(numberOfQuestions),
+      difficulty,
+      questionType,
+      timeLimit: Number(timeLimit),
+      timeType: "perStudent",
+      totalMarks: Number(totalMarks),
+      language,
+      rules: {
+        randomQuestions,
+        noRepeatedQuestions,
+        allowSkip,
+        followUpQuestions,
+        hintMode,
+        autoSave,
+      },
+      aiSettings: {
+        voice,
+        speechSpeed,
+        personality: aiPersonality,
+      },
     };
-  }, []);
+  };
 
-  // =====================================================
-  // LOADING
-  // =====================================================
+  // ================================
+  // Save Configuration (Draft / Persist)
+  // ================================
 
-  if (loading) {
+  const handleSaveConfiguration = async () => {
+    if (!validateConfiguration()) {
+      return false;
+    }
+
+    try {
+      setSaving(true);
+      setError("");
+
+      const payload = getPayload();
+      const response = await createVivaConfiguration(payload);
+
+      const configId =
+        response?.configuration?._id ||
+        response?.data?.configuration?._id;
+
+      const storedConfig = {
+        ...payload,
+        vivaConfigurationId: configId,
+        _id: configId,
+        className: selectedClass?.class?.name || "",
+        subject: selectedClass?.subject?.name || "",
+        department: selectedClass?.department?.name || "",
+        semester: selectedClass?.class?.semester || "",
+        selectedStudents,
+      };
+
+      localStorage.setItem("vivaConfig", JSON.stringify(storedConfig));
+
+      setSuccessMessage("✓ Viva configuration saved successfully.");
+      setTimeout(() => setSuccessMessage(""), 3500);
+
+      return true;
+    } catch (err) {
+      console.error("Save Viva Configuration Error:", err);
+      setError(
+        err?.response?.data?.message ||
+        err?.message ||
+        "Failed to save viva configuration."
+      );
+      return false;
+    } finally {
+      setSaving(false);
+    }
+  };
+
+  // ================================
+  // Open Confirmation Modal
+  // ================================
+
+  const handleOpenConfirm = () => {
+    if (!validateConfiguration()) {
+      return;
+    }
+    setShowModal(true);
+  };
+
+  // ================================
+  // Save & Continue to Study Material (Phase 9)
+  // ================================
+
+  const handleSaveAndContinue = async () => {
+    const success = await handleSaveConfiguration();
+    if (success) {
+      setShowModal(false);
+      navigate("/teacher/study-material");
+    }
+  };
+
+  // ================================
+  // Loading
+  // ================================
+
+  if (!selectedClass) {
     return (
-      <div style={styles.centerPage}>
-        <div style={styles.card}>
-          <div
-            style={styles.loader}
-          >
-            ⏳
-          </div>
-
-          <h2>
-            Loading Viva...
-          </h2>
-
-          <p style={styles.muted}>
-            Please wait while we
-            verify your Viva session.
-          </p>
-        </div>
+      <div className="start-viva-loading">
+        Loading Viva Configuration...
       </div>
     );
   }
 
-  // =====================================================
-  // SESSION ERROR
-  // =====================================================
-
-  if (
-    error &&
-    !session
-  ) {
-    return (
-      <div style={styles.centerPage}>
-        <div style={styles.card}>
-          <div
-            style={styles.errorIcon}
-          >
-            ⚠️
-          </div>
-
-          <h2>
-            Viva Unavailable
-          </h2>
-
-          <p
-            style={styles.errorText}
-          >
-            {error}
-          </p>
-
-          <button
-            onClick={
-              loadSession
-            }
-            style={
-              styles.primaryButton
-            }
-          >
-            🔄 Try Again
-          </button>
-        </div>
-      </div>
-    );
-  }
-
-  // =====================================================
-  // MAIN UI
-  // =====================================================
+  // ================================
+  // JSX
+  // ================================
 
   return (
-    <div style={styles.page}>
-      <div style={styles.container}>
+    <div className="start-viva-page">
+      <div className="start-viva-card">
 
-        {/* HEADER */}
+        {/* =========================
+            Header
+        ========================== */}
 
-        <div style={styles.header}>
-          <div>
-            <div style={styles.logo}>
-              VivaPartner
-            </div>
+        <div className="start-viva-header">
+          <span className="configuration-badge">
+            VIVA CONFIGURATION
+          </span>
 
-            <h1 style={styles.title}>
-              AI Voice Viva
-            </h1>
+          <h1>
+            Configure Viva Session
+          </h1>
 
-            <p style={styles.subtitle}>
-              Online Viva Examination
+          <p className="subtitle">
+            Configure all settings required
+            before starting the AI viva
+            examination.
+          </p>
+        </div>
+
+        {/* =========================
+            Class Information
+        ========================== */}
+
+        <div className="section-title">
+          <h2>Selected Class</h2>
+
+          <p>
+            The viva will be conducted for
+            this assigned class.
+          </p>
+        </div>
+
+        <div className="details-grid">
+
+          <div className="detail-box">
+            <span>Class</span>
+
+            <h3>
+              {selectedClass.class?.name ||
+                "N/A"}
+            </h3>
+          </div>
+
+          <div className="detail-box">
+            <span>Department</span>
+
+            <h3>
+              {selectedClass.department?.name ||
+                "N/A"}
+            </h3>
+          </div>
+
+          <div className="detail-box">
+            <span>Subject</span>
+
+            <h3>
+              {selectedClass.subject?.name ||
+                "N/A"}
+            </h3>
+          </div>
+
+          <div className="detail-box">
+            <span>Semester</span>
+
+            <h3>
+              {selectedClass.class?.semester ||
+                "N/A"}
+            </h3>
+          </div>
+
+          <div className="detail-box">
+            <span>Academic Year</span>
+
+            <h3>
+              {selectedClass.class
+                ?.academicYear ||
+                selectedClass.academicYear ||
+                "N/A"}
+            </h3>
+          </div>
+
+          <div className="detail-box">
+            <span>Status</span>
+
+            <h3>
+              {selectedClass.status ||
+                "Active"}
+            </h3>
+          </div>
+
+        </div>
+
+        {/* =========================
+            Configuration
+        ========================== */}
+
+        <div className="configuration-section">
+
+          {/* =========================
+              8.3 Students Per Viva
+          ========================== */}
+
+          <div className="section-title">
+            <h2>
+              Students Per Viva
+            </h2>
+
+            <p>
+              Select how many students
+              participate in one viva.
             </p>
           </div>
 
-          <div style={styles.status}>
-            ● {session?.status}
-          </div>
-        </div>
+          <div className="question-options">
 
-        {/* ERROR */}
-
-        {error && (
-          <div style={styles.errorBox}>
-            ⚠️ {error}
-          </div>
-        )}
-
-        {/* =================================================
-            STUDENT JOIN
-        ================================================= */}
-
-        {!student &&
-          !attempt && (
-            <div style={styles.card}>
-              <div style={styles.icon}>
-                🎓
-              </div>
-
-              <h2>
-                Welcome to Your Viva
-              </h2>
-
-              <p style={styles.muted}>
-                Enter your enrollment
-                number to continue.
-              </p>
-
-              <div
-                style={
-                  styles.sessionInfo
-                }
+            {[
+              {
+                value: 1,
+                title: "Individual",
+                description:
+                  "One student per viva",
+              },
+              {
+                value: 2,
+                title: "Pair",
+                description:
+                  "Two students per viva",
+              },
+              {
+                value: 3,
+                title: "Group of 3",
+                description:
+                  "Three students per viva",
+              },
+              {
+                value: 4,
+                title: "Group of 4",
+                description:
+                  "Four students per viva",
+              },
+            ].map((option) => (
+              <label
+                key={option.value}
+                className={`question-option ${studentsPerViva ===
+                    option.value
+                    ? "selected"
+                    : ""
+                  }`}
               >
-                <Info
-                  label="Class"
-                  value={
-                    session?.class
-                      ?.name || "—"
-                  }
-                />
-
-                <Info
-                  label="Subject"
-                  value={
-                    session?.subject
-                      ?.name || "—"
-                  }
-                />
-
-                <Info
-                  label="Questions"
-                  value={
-                    session?.numberOfQuestions ||
-                    "—"
-                  }
-                />
-
-                <Info
-                  label="Difficulty"
-                  value={
-                    session?.difficulty ||
-                    "—"
-                  }
-                />
-
-                <Info
-                  label="Language"
-                  value={
-                    session?.language ||
-                    "English"
-                  }
-                />
-              </div>
-
-              <form
-                onSubmit={
-                  handleJoin
-                }
-              >
-                <label
-                  style={styles.label}
-                >
-                  Enrollment Number
-                </label>
-
                 <input
-                  type="text"
-                  value={
-                    enrollmentNumber
+                  type="radio"
+                  name="studentsPerViva"
+                  value={option.value}
+                  checked={
+                    studentsPerViva ===
+                    option.value
                   }
-                  onChange={(e) =>
-                    setEnrollmentNumber(
-                      e.target.value
+                  onChange={() =>
+                    setStudentsPerViva(
+                      option.value
                     )
                   }
-                  placeholder="Enter enrollment number"
-                  autoComplete="off"
-                  style={styles.input}
                 />
 
-                <button
-                  type="submit"
-                  disabled={joining}
-                  style={{
-                    ...styles.primaryButton,
-                    opacity:
-                      joining
-                        ? 0.7
-                        : 1,
-                  }}
-                >
-                  {joining
-                    ? "Joining..."
-                    : "Continue →"}
-                </button>
-              </form>
-
-              <p
-                style={
-                  styles.securityText
-                }
-              >
-                🔒 Your marks will not
-                be displayed during
-                the Viva.
-              </p>
-            </div>
-          )}
-
-        {/* =================================================
-            STUDENT READY
-        ================================================= */}
-
-        {student &&
-          attempt &&
-          !vivaStarted && (
-            <div style={styles.card}>
-              <div
-                style={
-                  styles.successIcon
-                }
-              >
-                ✓
-              </div>
-
-              <h2>
-                Welcome,{" "}
-                {student.name ||
-                  "Student"}
-              </h2>
-
-              <p style={styles.muted}>
-                Your identity has been
-                verified.
-              </p>
-
-              <div
-                style={
-                  styles.studentBox
-                }
-              >
-                <Info
-                  label="Student"
-                  value={
-                    student.name ||
-                    "—"
-                  }
-                />
-
-                <Info
-                  label="Enrollment Number"
-                  value={
-                    student.enrollmentNumber ||
-                    enrollmentNumber ||
-                    "—"
-                  }
-                />
-
-                <Info
-                  label="Viva Status"
-                  value={
-                    attempt.status ||
-                    "NotStarted"
-                  }
-                />
-              </div>
-
-              <div
-                style={
-                  styles.instructions
-                }
-              >
-                <h3>
-                  Before you start
-                </h3>
-
-                <ul>
-                  <li>
-                    Use a quiet place.
-                  </li>
-
-                  <li>
-                    Allow microphone
-                    access.
-                  </li>
-
-                  <li>
-                    Answer clearly and
-                    verbally.
-                  </li>
-
-                  <li>
-                    Do not refresh the
-                    page during your Viva.
-                  </li>
-
-                  <li>
-                    Your marks will remain
-                    hidden.
-                  </li>
-                </ul>
-              </div>
-
-              {!speechSupported && (
-                <div
-                  style={
-                    styles.warningBox
-                  }
-                >
-                  ⚠️ Your browser does
-                  not support the required
-                  Speech Recognition API.
-                  Please use Google Chrome
-                  or Microsoft Edge.
-                </div>
-              )}
-
-              {!ttsSupported && (
-                <div
-                  style={
-                    styles.warningBox
-                  }
-                >
-                  ⚠️ Text-to-speech is not
-                  supported in this browser.
-                  You can still read the
-                  questions manually.
-                </div>
-              )}
-
-              {attempt.status !==
-                "Completed" && (
-                <button
-                  onClick={
-                    handleStart
-                  }
-                  disabled={
-                    starting
-                  }
-                  style={{
-                    ...styles.startButton,
-                    opacity:
-                      starting
-                        ? 0.7
-                        : 1,
-                  }}
-                >
-                  {starting
-                    ? "Starting Viva..."
-                    : "🎙 Start Viva"}
-                </button>
-              )}
-            </div>
-          )}
-
-        {/* =================================================
-            CURRENT QUESTION
-        ================================================= */}
-
-        {vivaStarted && (
-          <div
-            style={
-              styles.questionCard
-            }
-          >
-            {questionLoading ? (
-              <div
-                style={
-                  styles.questionLoading
-                }
-              >
-                <div
-                  style={
-                    styles.loader
-                  }
-                >
-                  ⏳
-                </div>
-
-                <h2>
-                  Loading Question...
-                </h2>
-
-                <p
-                  style={styles.muted}
-                >
-                  Preparing your next
-                  Viva question.
-                </p>
-              </div>
-            ) : currentQuestion ? (
-              <>
-                {/* QUESTION HEADER */}
-
-                <div
-                  style={
-                    styles.questionHeader
-                  }
-                >
-                  <span>
-                    Question{" "}
-                    {
-                      currentQuestion.questionNumber
-                    }
-                  </span>
-
-                  <span>
-                    {
-                      currentQuestion.questionNumber
-                    }{" "}
-                    /{" "}
-                    {
-                      currentQuestion.totalQuestions
-                    }
-                  </span>
-                </div>
-
-                {/* QUESTION */}
-
-                <div
-                  style={
-                    styles.questionBody
-                  }
-                >
-                  <div
-                    style={
-                      styles.questionBadge
-                    }
-                  >
-                    {
-                      currentQuestion.difficulty
-                    }
-                  </div>
-
-                  <h2
-                    style={
-                      styles.questionText
-                    }
-                  >
-                    {
-                      currentQuestion.question
-                    }
-                  </h2>
-                </div>
-
-                {/* =================================================
-                    10.7.4 AI QUESTION VOICE
-                ================================================= */}
-
-                <div
-                  style={
-                    styles.voiceQuestionCard
-                  }
-                >
-                  <div
-                    style={
-                      styles.voiceQuestionTop
-                    }
-                  >
-                    <div>
-                      <strong
-                        style={
-                          styles.voiceQuestionTitle
-                        }
-                      >
-                        🔊 AI Question
-                      </strong>
-
-                      <span
-                        style={
-                          styles.voiceQuestionStatus
-                        }
-                      >
-                        {isSpeaking
-                          ? "AI is asking the question..."
-                          : speechFinished
-                          ? "Question finished. You can answer now."
-                          : "Question ready"}
-                      </span>
-                    </div>
-
-                    <button
-                      type="button"
-                      onClick={() =>
-                        speakQuestion(
-                          currentQuestion.question
-                        )
-                      }
-                      disabled={
-                        isSpeaking ||
-                        !ttsSupported
-                      }
-                      style={{
-                        ...styles.askAgainButton,
-                        opacity:
-                          isSpeaking ||
-                          !ttsSupported
-                            ? 0.6
-                            : 1,
-                        cursor:
-                          isSpeaking ||
-                          !ttsSupported
-                            ? "not-allowed"
-                            : "pointer",
-                      }}
-                    >
-                      {isSpeaking
-                        ? "🔊 Speaking..."
-                        : "🔊 Ask Again"}
-                    </button>
-                  </div>
-
-                  <div
-                    style={
-                      styles.voiceWave
-                    }
-                  >
-                    {isSpeaking ? (
-                      <>
-                        <span>🔊</span>
-                        <span>
-                          AI is speaking...
-                        </span>
-                      </>
-                    ) : (
-                      <>
-                        <span>🔈</span>
-                        <span>
-                          Listen to the
-                          question before
-                          answering.
-                        </span>
-                      </>
-                    )}
-                  </div>
-                </div>
-
-                {/* =================================================
-                    10.7.3 MICROPHONE SECTION
-                ================================================= */}
-
-                <div
-                  style={
-                    styles.microphoneCard
-                  }
-                >
-                  <div
-                    style={
-                      styles.microphoneTitle
-                    }
-                  >
-                    🎙 Your Answer
-                  </div>
-
-                  {!speechSupported ? (
-                    <div
-                      style={
-                        styles.warningBox
-                      }
-                    >
-                      Speech recognition is
-                      not supported in this
-                      browser.
-                      <br />
-                      Please use Google Chrome
-                      or Microsoft Edge.
-                    </div>
-                  ) : (
-                    <>
-                      {/* LISTENING STATUS */}
-
-                      <div
-                        style={{
-                          ...styles.micStatus,
-                          ...(isListening
-                            ? styles.micListening
-                            : {}),
-                        }}
-                      >
-                        <span
-                          style={
-                            styles.micIcon
-                          }
-                        >
-                          {isListening
-                            ? "🔴"
-                            : "🎙️"}
-                        </span>
-
-                        <div>
-                          <strong>
-                            {isListening
-                              ? "Listening..."
-                              : "Microphone Ready"}
-                          </strong>
-
-                          <small>
-                            {isListening
-                              ? " Speak your answer clearly."
-                              : " Click Start Answer to speak."}
-                          </small>
-                        </div>
-                      </div>
-
-                      {/* ANSWER TEXT */}
-
-                      <div
-                        style={
-                          styles.answerBox
-                        }
-                      >
-                        {transcript ||
-                        interimTranscript ? (
-                          <>
-                            <span>
-                              {transcript}
-                            </span>
-
-                            {interimTranscript && (
-                              <span
-                                style={
-                                  styles.interim
-                                }
-                              >
-                                {" "}
-                                {
-                                  interimTranscript
-                                }
-                              </span>
-                            )}
-                          </>
-                        ) : (
-                          <span
-                            style={
-                              styles.placeholder
-                            }
-                          >
-                            Your spoken answer
-                            will appear here...
-                          </span>
-                        )}
-                      </div>
-
-                      {answerValidationError && (
-                        <div
-                          style={{
-                            marginTop: "10px",
-                            padding: "10px 12px",
-                            borderRadius: "8px",
-                            background: "#fff7ed",
-                            border: "1px solid #fed7aa",
-                            color: "#c2410c",
-                            fontSize: "13px",
-                            fontWeight: "600",
-                          }}
-                        >
-                          ⚠️ {answerValidationError}
-                        </div>
-                      )}
-
-                      {/* 11.5 VOICE ANSWER STATUS */}
-
-                      <div
-                        style={{
-                          marginTop: "12px",
-                          marginBottom: "12px",
-                          padding: "10px 14px",
-                          borderRadius: "10px",
-                          border: "1px solid rgba(255,255,255,0.12)",
-                          background: "rgba(255,255,255,0.04)",
-                          fontSize: "14px",
-                          fontWeight: "600",
-                        }}
-                      >
-                        {voiceUiLabel}
-                      </div>
-
-                      {voiceUiError && (
-                        <div
-                          style={{
-                            marginBottom: "12px",
-                            padding: "10px 14px",
-                            borderRadius: "10px",
-                            background: "#fff7ed",
-                            border: "1px solid #fed7aa",
-                            color: "#c2410c",
-                            fontSize: "13px",
-                            fontWeight: "600",
-                          }}
-                        >
-                          ⚠️ {voiceUiError}
-                        </div>
-                      )}
-
-                      {/* MICROPHONE BUTTONS */}
-
-                      <div
-                        style={
-                          styles.microphoneButtons
-                        }
-                      >
-                        {!isListening ? (
-                          <button
-                            type="button"
-                            onClick={
-                              startListening
-                            }
-                            style={
-                              styles.startMicButton
-                            }
-                          >
-                            🎙 Start Answer
-                          </button>
-                        ) : (
-                          <button
-                            type="button"
-                            onClick={
-                              stopListening
-                            }
-                            style={
-                              styles.stopMicButton
-                            }
-                          >
-                            ⏹ Stop Answer
-                          </button>
-                        )}
-
-                        {(transcript || interimTranscript) && (
-                          <button
-                            type="button"
-                            onClick={
-                              clearAnswer
-                            }
-                            style={
-                              styles.clearButton
-                            }
-                          >
-                            Clear
-                          </button>
-                        )}
-                      </div>
-
-                      <button
-                        type="button"
-                        onClick={handleSubmitAnswerUI}
-                        disabled={
-                          !hasAnswer ||
-                          isListening ||
-                          isAiSpeaking ||
-                          isSubmittingAnswer
-                        }
-                        style={{
-                          marginTop: "14px",
-                          width: "100%",
-                          padding: "12px 16px",
-                          borderRadius: "10px",
-                          border: "none",
-                          cursor:
-                            !hasAnswer ||
-                            isListening ||
-                            isAiSpeaking ||
-                            isSubmittingAnswer
-                              ? "not-allowed"
-                              : "pointer",
-                          opacity:
-                            !hasAnswer ||
-                            isListening ||
-                            isAiSpeaking ||
-                            isSubmittingAnswer
-                              ? 0.55
-                              : 1,
-                          fontWeight: "700",
-                        }}
-                      >
-                        {isSubmittingAnswer
-                          ? "⏳ Submitting..."
-                          : "Submit Answer →"}
-                      </button>
-
-                      <p
-                        style={
-                          styles.languageText
-                        }
-                      >
-                        🎧 Recognition language:{" "}
-                        {
-                          session?.language ||
-                          "English"
-                        }
-                      </p>
-                    </>
-                  )}
-                </div>
-
-                {/* PHASE STATUS */}
-
-                <div
-                  style={
-                    styles.phaseNote
-                  }
-                >
+                <div>
                   <strong>
-                    11.2 Complete
+                    {option.title}
                   </strong>
 
                   <span>
-                    AI can read each Viva question aloud using
-                    the selected language, voice and speech speed.
+                    {option.description}
                   </span>
                 </div>
-              </>
-            ) : (
-              <div
-                style={
-                  styles.completedBox
-                }
-              >
-                ✓ Viva questions
-                completed.
-              </div>
-            )}
+              </label>
+            ))}
+
           </div>
-        )}
+
+          {/* =========================
+              8.4 Number Of Questions
+          ========================== */}
+
+          <div className="config-control">
+            <div className="section-title">
+              <h2>
+                Number of Questions
+              </h2>
+
+              <p>
+                Select how many questions
+                the AI should ask.
+              </p>
+            </div>
+
+            <select
+              value={numberOfQuestions}
+              onChange={(e) =>
+                setNumberOfQuestions(
+                  Number(e.target.value)
+                )
+              }
+            >
+              <option value={5}>
+                5 Questions
+              </option>
+
+              <option value={10}>
+                10 Questions
+              </option>
+
+              <option value={15}>
+                15 Questions
+              </option>
+
+              <option value={20}>
+                20 Questions
+              </option>
+            </select>
+          </div>
+
+          {/* =========================
+              8.5 Difficulty
+          ========================== */}
+
+          <div className="config-control">
+
+            <div className="section-title">
+              <h2>
+                Difficulty Level
+              </h2>
+
+              <p>
+                Choose the difficulty of
+                generated questions.
+              </p>
+            </div>
+
+            <div className="difficulty-options">
+
+              {[
+                {
+                  value: "Easy",
+                  description:
+                    "Basic questions focused on fundamental concepts.",
+                },
+                {
+                  value: "Medium",
+                  description:
+                    "Balanced questions testing understanding and application.",
+                },
+                {
+                  value: "Hard",
+                  description:
+                    "Advanced questions requiring deeper knowledge.",
+                },
+                {
+                  value: "Mixed",
+                  description:
+                    "Combination of easy, medium and hard questions.",
+                },
+              ].map((option) => (
+                <label
+                  key={option.value}
+                  className={`difficulty-option ${difficulty ===
+                      option.value
+                      ? "selected"
+                      : ""
+                    }`}
+                >
+                  <input
+                    type="radio"
+                    name="difficulty"
+                    value={option.value}
+                    checked={
+                      difficulty ===
+                      option.value
+                    }
+                    onChange={() =>
+                      setDifficulty(
+                        option.value
+                      )
+                    }
+                  />
+
+                  <div className="difficulty-content">
+                    <strong>
+                      {option.value}
+                    </strong>
+
+                    <span>
+                      {option.description}
+                    </span>
+                  </div>
+                </label>
+              ))}
+
+            </div>
+
+            <div className="selected-difficulty-info">
+
+              <div className="difficulty-icon">
+                {difficulty
+                  .substring(0, 1)
+                  .toUpperCase()}
+              </div>
+
+              <div>
+                <strong>
+                  {difficulty} Difficulty
+                </strong>
+
+                <p>
+                  AI will generate questions
+                  according to this difficulty
+                  level.
+                </p>
+              </div>
+
+            </div>
+
+          </div>
+
+          {/* =========================
+              8.6 Question Type
+          ========================== */}
+
+          <div className="config-control">
+
+            <div className="section-title">
+              <h2>
+                Question Type
+              </h2>
+
+              <p>
+                Select the type of questions
+                the AI should generate.
+              </p>
+            </div>
+
+            <div className="question-type-options">
+
+              {[
+                {
+                  value: "Theory",
+                  description:
+                    "Conceptual and theoretical questions.",
+                },
+                {
+                  value: "Practical",
+                  description:
+                    "Questions based on practical implementation.",
+                },
+                {
+                  value: "Conceptual",
+                  description:
+                    "Questions focused on understanding concepts.",
+                },
+                {
+                  value: "Programming",
+                  description:
+                    "Programming and coding related questions.",
+                },
+                {
+                  value: "Mixed",
+                  description:
+                    "Combination of different question types.",
+                },
+              ].map((option) => (
+                <label
+                  key={option.value}
+                  className={`question-type-option ${questionType ===
+                      option.value
+                      ? "selected"
+                      : ""
+                    }`}
+                >
+                  <input
+                    type="radio"
+                    name="questionType"
+                    value={option.value}
+                    checked={
+                      questionType ===
+                      option.value
+                    }
+                    onChange={() =>
+                      setQuestionType(
+                        option.value
+                      )
+                    }
+                  />
+
+                  <div>
+                    <strong>
+                      {option.value}
+                    </strong>
+
+                    <span>
+                      {option.description}
+                    </span>
+                  </div>
+                </label>
+              ))}
+
+            </div>
+
+          </div>
+
+          {/* =========================
+              8.7 Time Limit
+          ========================== */}
+
+          <div className="config-control">
+
+            <div className="section-title">
+              <h2>
+                Time Per Student
+              </h2>
+
+              <p>
+                Set the maximum time allowed
+                for each student.
+              </p>
+            </div>
+
+            <select
+              value={timeLimit}
+              onChange={(e) =>
+                setTimeLimit(
+                  Number(e.target.value)
+                )
+              }
+            >
+              <option value={2}>
+                2 Minutes
+              </option>
+
+              <option value={5}>
+                5 Minutes
+              </option>
+
+              <option value={10}>
+                10 Minutes
+              </option>
+            </select>
+
+          </div>
+
+          {/* =========================
+              8.8 Total Marks
+          ========================== */}
+
+          <div className="config-control">
+
+            <div className="section-title">
+              <h2>
+                Total Marks
+              </h2>
+
+              <p>
+                Set the maximum marks for
+                this viva.
+              </p>
+            </div>
+
+            <div className="marks-options">
+
+              {[20, 30, 50, 100].map(
+                (marks) => (
+                  <label
+                    key={marks}
+                    className={`marks-option ${totalMarks === marks
+                        ? "selected"
+                        : ""
+                      }`}
+                  >
+                    <input
+                      type="radio"
+                      name="totalMarks"
+                      value={marks}
+                      checked={
+                        totalMarks === marks
+                      }
+                      onChange={() =>
+                        setTotalMarks(
+                          marks
+                        )
+                      }
+                    />
+
+                    <span>
+                      {marks}
+                    </span>
+                  </label>
+                )
+              )}
+
+            </div>
+
+          </div>
+
+          {/* =========================
+              8.9 Language
+          ========================== */}
+
+          <div className="config-control">
+
+            <div className="section-title">
+              <h2>
+                Language
+              </h2>
+
+              <p>
+                Select the language used
+                during the AI viva.
+              </p>
+            </div>
+
+            <div className="language-options">
+
+              {[
+                "English",
+                "Gujarati",
+                "Hindi",
+              ].map((item) => (
+                <label
+                  key={item}
+                  className={`language-option ${language === item
+                      ? "selected"
+                      : ""
+                    }`}
+                >
+                  <input
+                    type="radio"
+                    name="language"
+                    value={item}
+                    checked={
+                      language === item
+                    }
+                    onChange={() =>
+                      setLanguage(item)
+                    }
+                  />
+
+                  <span>
+                    {item}
+                  </span>
+                </label>
+              ))}
+
+            </div>
+
+          </div>
+
+          {/* =========================
+              8.10 Viva Rules
+          ========================== */}
+
+          <div className="config-control">
+
+            <div className="section-title">
+              <h2>
+                Viva Rules
+              </h2>
+
+              <p>
+                Configure how the AI should
+                conduct the viva.
+              </p>
+            </div>
+
+            <div className="rules-grid">
+
+              <label className="rule-option">
+                <input
+                  type="checkbox"
+                  checked={
+                    randomQuestions
+                  }
+                  onChange={(e) =>
+                    setRandomQuestions(
+                      e.target.checked
+                    )
+                  }
+                />
+
+                <div>
+                  <strong>
+                    Random Questions
+                  </strong>
+
+                  <span>
+                    Randomize questions for
+                    every viva.
+                  </span>
+                </div>
+              </label>
+
+              <label className="rule-option">
+                <input
+                  type="checkbox"
+                  checked={
+                    noRepeatedQuestions
+                  }
+                  onChange={(e) =>
+                    setNoRepeatedQuestions(
+                      e.target.checked
+                    )
+                  }
+                />
+
+                <div>
+                  <strong>
+                    No Repeated Questions
+                  </strong>
+
+                  <span>
+                    Avoid asking the same
+                    question again.
+                  </span>
+                </div>
+              </label>
+
+              <label className="rule-option">
+                <input
+                  type="checkbox"
+                  checked={allowSkip}
+                  onChange={(e) =>
+                    setAllowSkip(
+                      e.target.checked
+                    )
+                  }
+                />
+
+                <div>
+                  <strong>
+                    Allow Skip
+                  </strong>
+
+                  <span>
+                    Allow students to skip
+                    difficult questions.
+                  </span>
+                </div>
+              </label>
+
+              <label className="rule-option">
+                <input
+                  type="checkbox"
+                  checked={
+                    followUpQuestions
+                  }
+                  onChange={(e) =>
+                    setFollowUpQuestions(
+                      e.target.checked
+                    )
+                  }
+                />
+
+                <div>
+                  <strong>
+                    Follow-up Questions
+                  </strong>
+
+                  <span>
+                    AI can ask follow-up
+                    questions.
+                  </span>
+                </div>
+              </label>
+
+              <label className="rule-option">
+                <input
+                  type="checkbox"
+                  checked={hintMode}
+                  onChange={(e) =>
+                    setHintMode(
+                      e.target.checked
+                    )
+                  }
+                />
+
+                <div>
+                  <strong>
+                    Hint Mode
+                  </strong>
+
+                  <span>
+                    Allow AI to provide hints.
+                  </span>
+                </div>
+              </label>
+
+              <label className="rule-option">
+                <input
+                  type="checkbox"
+                  checked={autoSave}
+                  onChange={(e) =>
+                    setAutoSave(
+                      e.target.checked
+                    )
+                  }
+                />
+
+                <div>
+                  <strong>
+                    Auto Save
+                  </strong>
+
+                  <span>
+                    Automatically save viva
+                    progress.
+                  </span>
+                </div>
+              </label>
+
+            </div>
+
+          </div>
+
+          {/* =========================
+              8.11 AI Settings
+          ========================== */}
+
+          <div className="config-control ai-settings-section">
+
+            <div className="section-title">
+              <h2>
+                AI Settings
+              </h2>
+
+              <p>
+                Configure the voice and
+                personality of the AI during
+                the viva.
+              </p>
+            </div>
+
+            {/* Voice */}
+
+            <div className="ai-setting-group">
+
+              <h3>Voice</h3>
+
+              <p>
+                Select the AI voice used to
+                ask questions.
+              </p>
+
+              <div className="ai-options">
+
+                {[
+                  "Male",
+                  "Female",
+                ].map((item) => (
+                  <label
+                    key={item}
+                    className={`ai-option ${voice === item
+                        ? "selected"
+                        : ""
+                      }`}
+                  >
+                    <input
+                      type="radio"
+                      name="voice"
+                      value={item}
+                      checked={
+                        voice === item
+                      }
+                      onChange={() =>
+                        setVoice(item)
+                      }
+                    />
+
+                    <div>
+                      <strong>
+                        {item}
+                      </strong>
+
+                      <span>
+                        {item} AI voice
+                      </span>
+                    </div>
+                  </label>
+                ))}
+
+              </div>
+
+            </div>
+
+            {/* Speech Speed */}
+
+            <div className="ai-setting-group">
+
+              <h3>
+                Speech Speed
+              </h3>
+
+              <p>
+                Control how quickly the AI
+                speaks during the viva.
+              </p>
+
+              <div className="ai-options">
+
+                {[
+                  {
+                    value: "Slow",
+                    description:
+                      "AI speaks slowly and clearly.",
+                  },
+                  {
+                    value: "Normal",
+                    description:
+                      "Standard speaking speed.",
+                  },
+                  {
+                    value: "Fast",
+                    description:
+                      "AI speaks at a faster speed.",
+                  },
+                ].map((item) => (
+                  <label
+                    key={item.value}
+                    className={`ai-option ${speechSpeed ===
+                        item.value
+                        ? "selected"
+                        : ""
+                      }`}
+                  >
+                    <input
+                      type="radio"
+                      name="speechSpeed"
+                      value={item.value}
+                      checked={
+                        speechSpeed ===
+                        item.value
+                      }
+                      onChange={() =>
+                        setSpeechSpeed(
+                          item.value
+                        )
+                      }
+                    />
+
+                    <div>
+                      <strong>
+                        {item.value}
+                      </strong>
+
+                      <span>
+                        {item.description}
+                      </span>
+                    </div>
+                  </label>
+                ))}
+
+              </div>
+
+            </div>
+
+            {/* AI Personality */}
+
+            <div className="ai-setting-group">
+
+              <h3>
+                AI Personality
+              </h3>
+
+              <p>
+                Choose how the AI interacts
+                with students.
+              </p>
+
+              <div className="ai-options">
+
+                {[
+                  {
+                    value:
+                      "Professional",
+                    description:
+                      "Formal and examination-focused.",
+                  },
+                  {
+                    value: "Friendly",
+                    description:
+                      "Friendly and comfortable interaction.",
+                  },
+                  {
+                    value: "Strict",
+                    description:
+                      "Strict and examination-oriented.",
+                  },
+                ].map((item) => (
+                  <label
+                    key={item.value}
+                    className={`ai-option ${aiPersonality ===
+                        item.value
+                        ? "selected"
+                        : ""
+                      }`}
+                  >
+                    <input
+                      type="radio"
+                      name="aiPersonality"
+                      value={item.value}
+                      checked={
+                        aiPersonality ===
+                        item.value
+                      }
+                      onChange={() =>
+                        setAiPersonality(
+                          item.value
+                        )
+                      }
+                    />
+
+                    <div>
+                      <strong>
+                        {item.value}
+                      </strong>
+
+                      <span>
+                        {item.description}
+                      </span>
+                    </div>
+                  </label>
+                ))}
+
+              </div>
+
+            </div>
+
+            {/* Selected AI Settings */}
+
+            <div className="selected-ai-info">
+
+              <div className="ai-icon">
+                AI
+              </div>
+
+              <div>
+                <strong>
+                  Current AI Configuration
+                </strong>
+
+                <p>
+                  {voice} voice •{" "}
+                  {speechSpeed} speech •{" "}
+                  {aiPersonality} personality
+                </p>
+              </div>
+
+            </div>
+
+          </div>
+
+        </div>
+
+        {/* =========================
+            Warning
+        ========================== */}
+
+        <div className="warning-box">
+
+          <strong>
+            ⚠ Important
+          </strong>
+
+          <p>
+            These settings will be used by
+            the AI question generator,
+            voice assistant and evaluation
+            system during this viva session.
+          </p>
+
+        </div>
+
+        {/* =========================
+            Actions
+        ========================== */}
+
+        <div className="actions">
+
+          <button
+            className="cancel-btn"
+            onClick={() =>
+              navigate(
+                "/teacher/assigned-classes"
+              )
+            }
+            disabled={saving}
+          >
+            ← Cancel
+          </button>
+
+          <button
+            className="start-btn"
+            onClick={handleOpenConfirm}
+            disabled={saving}
+          >
+            Save & Continue →
+          </button>
+
+        </div>
+
       </div>
+
+      {/* =========================
+          Confirmation Modal
+      ========================== */}
+
+      {showModal && (
+        <div className="modal-overlay">
+
+          <div className="modal">
+
+            <h2>
+              Confirm Viva Configuration
+            </h2>
+
+            <p>
+              Please review your configuration
+              before continuing.
+            </p>
+
+            <div className="confirmation-list">
+
+              <div>
+                <span>
+                  Class
+                </span>
+
+                <strong>
+                  {selectedClass.class?.name ||
+                    "N/A"}
+                </strong>
+              </div>
+
+              <div>
+                <span>
+                  Students / Viva
+                </span>
+
+                <strong>
+                  {studentsPerViva}
+                </strong>
+              </div>
+
+              <div>
+                <span>
+                  Questions
+                </span>
+
+                <strong>
+                  {numberOfQuestions}
+                </strong>
+              </div>
+
+              <div>
+                <span>
+                  Difficulty
+                </span>
+
+                <strong>
+                  {difficulty}
+                </strong>
+              </div>
+
+              <div>
+                <span>
+                  Question Type
+                </span>
+
+                <strong>
+                  {questionType}
+                </strong>
+              </div>
+
+              <div>
+                <span>
+                  Time
+                </span>
+
+                <strong>
+                  {timeLimit} Minutes
+                </strong>
+              </div>
+
+              <div>
+                <span>
+                  Total Marks
+                </span>
+
+                <strong>
+                  {totalMarks}
+                </strong>
+              </div>
+
+              <div>
+                <span>
+                  Language
+                </span>
+
+                <strong>
+                  {language}
+                </strong>
+              </div>
+
+              <div>
+                <span>
+                  AI Voice
+                </span>
+
+                <strong>
+                  {voice}
+                </strong>
+              </div>
+
+              <div>
+                <span>
+                  Speech Speed
+                </span>
+
+                <strong>
+                  {speechSpeed}
+                </strong>
+              </div>
+
+              <div>
+                <span>
+                  AI Personality
+                </span>
+
+                <strong>
+                  {aiPersonality}
+                </strong>
+              </div>
+
+            </div>
+
+            <div className="modal-actions">
+
+              <button
+                className="cancel-btn"
+                onClick={() =>
+                  setShowModal(false)
+                }
+                disabled={saving}
+              >
+                Back
+              </button>
+
+              <button
+                className="start-btn"
+                onClick={
+                  handleSaveAndContinue
+                }
+                disabled={saving}
+              >
+                {saving
+                  ? "Saving..."
+                  : "Save Configuration →"}
+              </button>
+
+            </div>
+
+          </div>
+
+        </div>
+      )}
+
     </div>
   );
 };
 
-// =====================================================
-// SPEECH RECOGNITION LANGUAGE
-// =====================================================
-
-const getSpeechLanguage = (
-  language
-) => {
-  switch (language) {
-    case "Gujarati":
-      return "gu-IN";
-
-    case "Hindi":
-      return "hi-IN";
-
-    case "English":
-    default:
-      return "en-IN";
-  }
-};
-
-// =====================================================
-// TEXT-TO-SPEECH SPEED
-// =====================================================
-
-const getSpeechRate = (
-  speed
-) => {
-  switch (speed) {
-    case "Slow":
-      return 0.75;
-
-    case "Fast":
-      return 1.15;
-
-    case "Normal":
-    default:
-      return 1;
-  }
-};
-
-// =====================================================
-// INFO COMPONENT
-// =====================================================
-
-const Info = ({
-  label,
-  value,
-}) => {
-  return (
-    <div style={styles.infoItem}>
-      <span
-        style={
-          styles.infoLabel
-        }
-      >
-        {label}
-      </span>
-
-      <strong
-        style={
-          styles.infoValue
-        }
-      >
-        {value}
-      </strong>
-    </div>
-  );
-};
-
-// =====================================================
-// STYLES
-// =====================================================
-
-const styles = {
-  page: {
-    minHeight: "100vh",
-    background:
-      "linear-gradient(135deg, #f8fafc, #eef2ff)",
-    padding: "30px 20px",
-    boxSizing: "border-box",
-  },
-
-  centerPage: {
-    minHeight: "100vh",
-    background:
-      "linear-gradient(135deg, #f8fafc, #eef2ff)",
-    display: "flex",
-    alignItems: "center",
-    justifyContent: "center",
-    padding: "20px",
-    boxSizing: "border-box",
-  },
-
-  container: {
-    width: "100%",
-    maxWidth: "850px",
-    margin: "0 auto",
-  },
-
-  header: {
-    display: "flex",
-    justifyContent: "space-between",
-    alignItems: "flex-start",
-    gap: "20px",
-    marginBottom: "30px",
-  },
-
-  logo: {
-    fontSize: "15px",
-    fontWeight: "800",
-    color: "#2563eb",
-    marginBottom: "8px",
-  },
-
-  title: {
-    margin: 0,
-    fontSize: "32px",
-    color: "#0f172a",
-  },
-
-  subtitle: {
-    marginTop: "8px",
-    color: "#64748b",
-  },
-
-  status: {
-    background: "#dcfce7",
-    color: "#166534",
-    padding: "8px 14px",
-    borderRadius: "20px",
-    fontSize: "13px",
-    fontWeight: "700",
-  },
-
-  card: {
-    background: "#ffffff",
-    borderRadius: "20px",
-    padding: "35px",
-    boxShadow:
-      "0 15px 40px rgba(15, 23, 42, 0.08)",
-    border:
-      "1px solid #e2e8f0",
-  },
-
-  icon: {
-    width: "70px",
-    height: "70px",
-    borderRadius: "50%",
-    background: "#eff6ff",
-    display: "flex",
-    alignItems: "center",
-    justifyContent: "center",
-    fontSize: "32px",
-    marginBottom: "20px",
-  },
-
-  successIcon: {
-    width: "70px",
-    height: "70px",
-    borderRadius: "50%",
-    background: "#dcfce7",
-    color: "#16a34a",
-    display: "flex",
-    alignItems: "center",
-    justifyContent: "center",
-    fontSize: "32px",
-    fontWeight: "800",
-    marginBottom: "20px",
-  },
-
-  errorIcon: {
-    fontSize: "45px",
-    marginBottom: "15px",
-  },
-
-  muted: {
-    color: "#64748b",
-    lineHeight: "1.6",
-  },
-
-  sessionInfo: {
-    display: "grid",
-    gridTemplateColumns:
-      "repeat(auto-fit, minmax(150px, 1fr))",
-    gap: "12px",
-    margin: "25px 0",
-  },
-
-  studentBox: {
-    display: "grid",
-    gridTemplateColumns:
-      "repeat(auto-fit, minmax(180px, 1fr))",
-    gap: "12px",
-    margin: "25px 0",
-  },
-
-  infoItem: {
-    background: "#f8fafc",
-    border:
-      "1px solid #e2e8f0",
-    borderRadius: "12px",
-    padding: "14px",
-  },
-
-  infoLabel: {
-    display: "block",
-    fontSize: "12px",
-    color: "#64748b",
-    marginBottom: "5px",
-  },
-
-  infoValue: {
-    color: "#0f172a",
-    wordBreak: "break-word",
-  },
-
-  label: {
-    display: "block",
-    fontWeight: "700",
-    color: "#334155",
-    marginBottom: "8px",
-  },
-
-  input: {
-    width: "100%",
-    boxSizing: "border-box",
-    padding: "14px 16px",
-    borderRadius: "10px",
-    border:
-      "1px solid #cbd5e1",
-    outline: "none",
-    fontSize: "16px",
-    marginBottom: "15px",
-  },
-
-  primaryButton: {
-    width: "100%",
-    padding: "14px 20px",
-    border: "none",
-    borderRadius: "10px",
-    background: "#2563eb",
-    color: "#ffffff",
-    fontSize: "16px",
-    fontWeight: "700",
-    cursor: "pointer",
-  },
-
-  startButton: {
-    width: "100%",
-    padding: "16px 20px",
-    border: "none",
-    borderRadius: "10px",
-    background: "#16a34a",
-    color: "#ffffff",
-    fontSize: "17px",
-    fontWeight: "700",
-    cursor: "pointer",
-  },
-
-  securityText: {
-    textAlign: "center",
-    marginTop: "18px",
-    fontSize: "13px",
-    color: "#64748b",
-  },
-
-  instructions: {
-    background: "#f8fafc",
-    borderRadius: "12px",
-    padding: "18px 20px",
-    marginBottom: "25px",
-    color: "#475569",
-  },
-
-  completedBox: {
-    background: "#f0fdf4",
-    color: "#166534",
-    padding: "15px",
-    borderRadius: "10px",
-    textAlign: "center",
-    fontWeight: "700",
-  },
-
-  errorBox: {
-    background: "#fef2f2",
-    color: "#b91c1c",
-    border:
-      "1px solid #fecaca",
-    padding: "14px 16px",
-    borderRadius: "10px",
-    marginBottom: "20px",
-  },
-
-  errorText: {
-    color: "#b91c1c",
-    lineHeight: "1.6",
-    marginBottom: "20px",
-  },
-
-  warningBox: {
-    background: "#fffbeb",
-    color: "#92400e",
-    border:
-      "1px solid #fde68a",
-    padding: "14px 16px",
-    borderRadius: "10px",
-    marginBottom: "20px",
-    lineHeight: "1.5",
-  },
-
-  loader: {
-    fontSize: "40px",
-    marginBottom: "15px",
-  },
-
-  questionCard: {
-    marginTop: "25px",
-    background: "#ffffff",
-    borderRadius: "20px",
-    padding: "30px",
-    boxShadow:
-      "0 15px 40px rgba(15, 23, 42, 0.08)",
-    border:
-      "1px solid #e2e8f0",
-  },
-
-  questionLoading: {
-    textAlign: "center",
-    padding: "30px",
-  },
-
-  questionHeader: {
-    display: "flex",
-    justifyContent: "space-between",
-    alignItems: "center",
-    marginBottom: "25px",
-    color: "#64748b",
-    fontWeight: "700",
-  },
-
-  questionBody: {
-    background: "#f8fafc",
-    borderRadius: "15px",
-    padding: "25px",
-  },
-
-  questionBadge: {
-    display: "inline-block",
-    background: "#2563eb",
-    color: "#ffffff",
-    padding: "5px 12px",
-    borderRadius: "20px",
-    fontSize: "12px",
-    fontWeight: "700",
-    marginBottom: "15px",
-  },
-
-  questionText: {
-    margin: 0,
-    color: "#0f172a",
-    lineHeight: "1.6",
-    fontSize: "22px",
-  },
-
-  // ===================================================
-  // 10.7.4 QUESTION VOICE
-  // ===================================================
-
-  voiceQuestionCard: {
-    marginTop: "20px",
-    padding: "18px",
-    background: "#eff6ff",
-    borderRadius: "14px",
-    border:
-      "1px solid #bfdbfe",
-  },
-
-  voiceQuestionTop: {
-    display: "flex",
-    alignItems: "center",
-    justifyContent: "space-between",
-    gap: "15px",
-    flexWrap: "wrap",
-  },
-
-  voiceQuestionTitle: {
-    display: "block",
-    color: "#1e3a8a",
-    marginBottom: "5px",
-    fontSize: "17px",
-  },
-
-  voiceQuestionStatus: {
-    display: "block",
-    fontSize: "13px",
-    color: "#64748b",
-  },
-
-  askAgainButton: {
-    padding: "11px 18px",
-    border: "none",
-    borderRadius: "10px",
-    background: "#2563eb",
-    color: "#ffffff",
-    fontWeight: "700",
-    cursor: "pointer",
-  },
-
-  voiceWave: {
-    marginTop: "15px",
-    padding: "12px",
-    background: "#ffffff",
-    borderRadius: "10px",
-    display: "flex",
-    alignItems: "center",
-    justifyContent: "center",
-    gap: "8px",
-    color: "#475569",
-    fontSize: "13px",
-  },
-
-  // ===================================================
-  // MICROPHONE
-  // ===================================================
-
-  microphoneCard: {
-    marginTop: "25px",
-    padding: "22px",
-    background: "#f8fafc",
-    borderRadius: "15px",
-    border:
-      "1px solid #e2e8f0",
-  },
-
-  microphoneTitle: {
-    fontSize: "18px",
-    fontWeight: "800",
-    color: "#0f172a",
-    marginBottom: "15px",
-  },
-
-  micStatus: {
-    display: "flex",
-    alignItems: "center",
-    gap: "12px",
-    padding: "14px",
-    background: "#ffffff",
-    borderRadius: "12px",
-    border:
-      "1px solid #e2e8f0",
-    marginBottom: "15px",
-  },
-
-  micListening: {
-    border:
-      "1px solid #fca5a5",
-    background: "#fff7f7",
-  },
-
-  micIcon: {
-    fontSize: "25px",
-  },
-
-  answerBox: {
-    minHeight: "120px",
-    padding: "18px",
-    background: "#ffffff",
-    border:
-      "1px solid #cbd5e1",
-    borderRadius: "12px",
-    color: "#334155",
-    lineHeight: "1.7",
-    fontSize: "16px",
-    boxSizing: "border-box",
-  },
-
-  placeholder: {
-    color: "#94a3b8",
-  },
-
-  interim: {
-    color: "#94a3b8",
-    fontStyle: "italic",
-  },
-
-  microphoneButtons: {
-    display: "flex",
-    gap: "10px",
-    marginTop: "15px",
-    flexWrap: "wrap",
-  },
-
-  startMicButton: {
-    flex: 1,
-    minWidth: "180px",
-    padding: "14px 18px",
-    border: "none",
-    borderRadius: "10px",
-    background: "#2563eb",
-    color: "#ffffff",
-    fontSize: "15px",
-    fontWeight: "700",
-    cursor: "pointer",
-  },
-
-  stopMicButton: {
-    flex: 1,
-    minWidth: "180px",
-    padding: "14px 18px",
-    border: "none",
-    borderRadius: "10px",
-    background: "#dc2626",
-    color: "#ffffff",
-    fontSize: "15px",
-    fontWeight: "700",
-    cursor: "pointer",
-  },
-
-  clearButton: {
-    padding: "14px 18px",
-    border: "1px solid #cbd5e1",
-    borderRadius: "10px",
-    background: "#ffffff",
-    color: "#475569",
-    fontWeight: "700",
-    cursor: "pointer",
-  },
-
-  languageText: {
-    marginTop: "12px",
-    marginBottom: 0,
-    fontSize: "12px",
-    color: "#64748b",
-    textAlign: "center",
-  },
-
-  phaseNote: {
-    marginTop: "20px",
-    padding: "12px 15px",
-    background: "#eff6ff",
-    color: "#1d4ed8",
-    borderRadius: "10px",
-    display: "flex",
-    flexDirection: "column",
-    gap: "4px",
-    fontSize: "13px",
-  },
-};
-
-export default StudentViva;
+export default StartViva; 

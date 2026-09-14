@@ -78,9 +78,19 @@ const Sidebar = ({ sidebarOpen, setSidebarOpen }) => {
       icon: <FaClipboardList />,
     },
     {
+      name: "Students",
+      path: "/teacher/students",
+      icon: <FaUsers />,
+    },
+    {
       name: "Viva Setup",
       path: "/teacher/viva-setup",
       icon: <FaMicrophone />,
+    },
+    {
+      name: "Viva Results",
+      path: "/teacher/results",
+      icon: <FaChartBar />,
     },
   ];
 

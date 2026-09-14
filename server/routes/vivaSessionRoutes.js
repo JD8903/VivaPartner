@@ -3,6 +3,8 @@ const express = require("express");
 const {
   createVivaSession,
   getVivaSession,
+  getTeacherVivaSessions,
+  getSessionAnalytics,
   getStudentVivaLink,
   joinVivaSession,
   startVivaSession,
@@ -11,6 +13,7 @@ const {
   startPublicViva,
   submitPublicVivaAnswer,
   completePublicViva,
+  evaluateSessionAttempts,
 } = require("../controllers/vivaSessionController");
 
 const { protect } = require("../middleware/authMiddleware");
@@ -21,22 +24,44 @@ const router = express.Router();
 // Teacher Routes
 // ======================================================
 
+// List all Teacher Viva Sessions (Phase 14)
+// GET /api/viva-sessions
+router.get(
+  "/",
+  protect,
+  getTeacherVivaSessions
+);
+
 // Create Viva Session
 // POST /api/viva-sessions
-
 router.post(
   "/",
   protect,
   createVivaSession
 );
 
+// Get Teacher Viva Session Analytics (Phase 14)
+// GET /api/viva-sessions/:sessionId/analytics
+router.get(
+  "/:sessionId/analytics",
+  protect,
+  getSessionAnalytics
+);
+
 // Get Student Share Link
 // GET /api/viva-sessions/:sessionId/share-link
-
 router.get(
   "/:sessionId/share-link",
   protect,
   getStudentVivaLink
+);
+
+// Trigger AI Evaluation for Session
+// POST /api/viva-sessions/:sessionId/evaluate
+router.post(
+  "/:sessionId/evaluate",
+  protect,
+  evaluateSessionAttempts
 );
 
 // ======================================================

@@ -32,9 +32,15 @@ const studentSchema = new mongoose.Schema(
       trim: true,
     },
 
+    class: {
+      type: mongoose.Schema.Types.ObjectId,
+      ref: "Class",
+      default: null,
+    },
+
     teacher: {
       type: mongoose.Schema.Types.ObjectId,
-      ref: "Teacher",
+      ref: "User",
       default: null,
     },
 
@@ -53,5 +59,23 @@ const studentSchema = new mongoose.Schema(
     timestamps: true,
   }
 );
+
+studentSchema.virtual("enrollmentNumber").get(function () {
+  return this.enrollment;
+});
+
+studentSchema.virtual("enrollmentNo").get(function () {
+  return this.enrollment;
+});
+
+studentSchema.virtual("studentName").get(function () {
+  return this.name;
+});
+
+studentSchema.set("toJSON", { virtuals: true });
+studentSchema.set("toObject", { virtuals: true });
+
+studentSchema.index({ classId: 1 });
+studentSchema.index({ class: 1 });
 
 module.exports = mongoose.model("Student", studentSchema);
