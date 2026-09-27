@@ -85,27 +85,32 @@ app.get("/api", (req, res) => {
 // =======================
 // API Routes
 // =======================
-app.use("/api/auth", authRoutes);
-app.use("/api/teachers", teacherRoutes);
-app.use("/api/departments", departmentRoutes);
-app.use("/api/subjects", subjectRoutes);
-app.use("/api/classes", classRoutes);
-app.use("/api/assignments", assignmentRoutes);
-app.use("/api/reports", reportsRoutes);
-app.use("/api/export", exportRoutes);
-app.use("/api/teacher", teacherDashboardRoutes);
-app.use("/api/viva-sessions", vivaSessionRoutes);
-app.use("/api/viva/public", publicVivaRoutes);
-app.use("/api/docx", docxRoutes);
-app.use("/api/pdf", pdfRoutes);
-app.use("/api/pptx", pptxRoutes);
-app.use("/api/ai", aiRoutes);
-app.use("/api/questions", questionRoutes);
-app.use("/api/students", studentRoutes);
-app.use("/api/student-groups", studentGroupRoutes);
-app.use("/api/study-material", studyMaterialRoutes);
-app.use("/api/results", resultsRoutes);
-app.use("/api/viva/configure", vivaConfigurationRoutes);
+const registerRoutes = (prefix) => {
+  app.use(`${prefix}/auth`, authRoutes);
+  app.use(`${prefix}/teachers`, teacherRoutes);
+  app.use(`${prefix}/departments`, departmentRoutes);
+  app.use(`${prefix}/subjects`, subjectRoutes);
+  app.use(`${prefix}/classes`, classRoutes);
+  app.use(`${prefix}/assignments`, assignmentRoutes);
+  app.use(`${prefix}/reports`, reportsRoutes);
+  app.use(`${prefix}/export`, exportRoutes);
+  app.use(`${prefix}/teacher`, teacherDashboardRoutes);
+  app.use(`${prefix}/viva-sessions`, vivaSessionRoutes);
+  app.use(`${prefix}/viva/public`, publicVivaRoutes);
+  app.use(`${prefix}/docx`, docxRoutes);
+  app.use(`${prefix}/pdf`, pdfRoutes);
+  app.use(`${prefix}/pptx`, pptxRoutes);
+  app.use(`${prefix}/ai`, aiRoutes);
+  app.use(`${prefix}/questions`, questionRoutes);
+  app.use(`${prefix}/students`, studentRoutes);
+  app.use(`${prefix}/student-groups`, studentGroupRoutes);
+  app.use(`${prefix}/study-material`, studyMaterialRoutes);
+  app.use(`${prefix}/results`, resultsRoutes);
+  app.use(`${prefix}/viva/configure`, vivaConfigurationRoutes);
+};
+
+registerRoutes("/api");
+registerRoutes("");
 
 // =======================
 // Upload / Multer errors
