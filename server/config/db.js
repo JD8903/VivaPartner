@@ -1,16 +1,38 @@
 const mongoose = require("mongoose");
 
+let cached = global.mongoose;
+
+if (!cached) {
+  cached = global.mongoose = { conn: null, promise: null };
+}
+
 const connectDB = async () => {
-    try {
-        const conn = await mongoose.connect(process.env.MONGO_URI);
+  if (cached.conn) {
+    return cached.conn;
+  }
 
-        console.log(`✅ MongoDB Connected: ${conn.connection.host}`);
-    } catch (error) {
-        console.error("❌ MongoDB Connection Failed");
-        console.error(error.message);
+  if (!cached.promise) {
+    const opts = {
+      bufferCommands: false,
+    };
 
-        process.exit(1);
-    }
+    const mongoUri = process.env.MONGO_URI || "mongodb://localhost:27017/vivapartner";
+
+    cached.promise = mongoose.connect(mongoUri, opts).then((mongooseInstance) => {
+      console.log(`✅ MongoDB Connected`);
+      return mongooseInstance;
+    });
+  }
+
+  try {
+    cached.conn = await cached.promise;
+  } catch (e) {
+    cached.promise = null;
+    console.error("❌ MongoDB Connection Error:", e.message);
+    throw e;
+  }
+
+  return cached.conn;
 };
 
 module.exports = connectDB;
