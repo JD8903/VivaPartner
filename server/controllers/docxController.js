@@ -2,19 +2,28 @@ const fs = require("fs");
 const path = require("path");
 const mammoth = require("mammoth");
 
-const permanentDir = path.join(
-  __dirname,
-  "../uploads/study-material"
-);
+const os = require("os");
+
+const isServerless = process.env.VERCEL || process.env.AWS_LAMBDA_FUNCTION_NAME;
+const permanentDir = isServerless
+  ? path.join(os.tmpdir(), "uploads", "study-material")
+  : path.join(__dirname, "../uploads/study-material");
 
 const moveToStudyMaterial = (filePath, fileName) => {
-  fs.mkdirSync(permanentDir, { recursive: true });
-  const destination = path.join(
-    permanentDir,
-    `${Date.now()}-${path.basename(fileName)}`
-  );
-  fs.renameSync(filePath, destination);
-  return `/uploads/study-material/${path.basename(destination)}`;
+  try {
+    if (!fs.existsSync(permanentDir)) {
+      fs.mkdirSync(permanentDir, { recursive: true });
+    }
+    const destination = path.join(
+      permanentDir,
+      `${Date.now()}-${path.basename(fileName)}`
+    );
+    fs.renameSync(filePath, destination);
+    return `/uploads/study-material/${path.basename(destination)}`;
+  } catch (err) {
+    console.warn("Move to study material warning:", err.message);
+    return `/uploads/${path.basename(filePath)}`;
+  }
 };
 
 const extractDOCX = async (req, res) => {
